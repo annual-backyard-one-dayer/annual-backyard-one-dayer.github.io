@@ -185,16 +185,27 @@ a.btnlink.ghost{border-color:transparent;background:transparent;font-weight:500}
 input[type=email],input[type=password]{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;min-width:0}
 textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;color:var(--ink)}
 
+
+.hero{display:flex;justify-content:center;align-items:center;position:relative;padding-top:4px}
+.hero-right{position:absolute;right:0;top:0}
+.logo-hero img{width:min(240px,62vw);height:auto;display:block}
+.logo-sm img{width:52px;height:52px;display:block}
+.logo-link{flex:none;line-height:0}
+.vote-head{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.logo-vote img{width:min(180px,50vw);height:auto;display:block}
+.s-logo{display:flex;align-items:center;padding:6px 10px 6px 14px}
+.s-logo img{width:58px;height:58px;display:block}
+@media (max-width:640px){.s-logo{display:none}}
 </style>
 </head>
 <body>
-<main id="app" aria-live="polite"><div class="card"><h1>One-Dayer Scorer</h1><p class="muted">Loading the scorebook…</p></div></main>
+<main id="app" aria-live="polite"><div class="hero"><picture class="logo-hero"><source srcset="img/logo-inverted.png" media="(prefers-color-scheme: dark)"><img src="img/logo.png" alt="Annual Backyard One Dayer"></picture></div><p class="muted" style="text-align:center">Loading the scorebook…</p></main>
 <div class="strip" id="strip" hidden></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

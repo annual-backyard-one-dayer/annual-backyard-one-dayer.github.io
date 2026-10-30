@@ -179,6 +179,7 @@ function paintStrip(){
   const overNo = inn.overs.length + (D && isCur(inn) && canWrite ? 1 : 0);
   $strip.hidden = false;
   $strip.innerHTML = `<div class="strip-in" role="status" aria-label="Live score">
+    <div class="s-logo"><img src="img/logo-inverted.png" alt=""></div>
     <div class="s-team ${team}"><span class="t">${esc(team)}</span><span class="sc">${f.wkts}/${f.runs}</span><span class="ov">${ord(inn.no)} inns · ${inn.complete ? 'complete' : 'over '+Math.max(overNo,1)}</span></div>
     <div class="s-bat">${bats.length ? bats.map(b=>`<div class="ln"><span>${esc(b.name)}</span><span><b>${b.runs}${b.out?'':'*'}</b>${b.bk?`<span class="bl">(${b.balls})</span>`:''}</span></div>`).join('') : '<div class="ln"><span>Innings complete</span></div>'}</div>
     <div class="s-bowl"><span class="lab">Bowling</span><span class="fig">${bowler ? `${esc(bowler)} <b>${bf?bf.wkts:0}–${bf?bf.runs:0}</b> <span style="color:var(--strip-muted)">(${bf?bf.overs:0} ov)</span>` : '—'}</span></div>
@@ -194,9 +195,11 @@ function render(){
   if (UI.focus) { const el = document.getElementById(UI.focus); if (el) el.focus(); UI.focus = null; }
   if (document.getElementById('qr')) drawQr();
 }
+const LOGO = (cls, alt='Annual Backyard One Dayer') => `<picture class="${cls}"><source srcset="img/logo-inverted.png" media="(prefers-color-scheme: dark)"><img src="img/logo.png" alt="${alt}"></picture>`;
 function topbar(title, sub){
+  if (V === 'home') return `<div class="hero">${LOGO('logo-hero')}<div class="hero-right"><span id="savestate" class="savestate muted"></span></div></div>`;
   if (M && M.practice && !['home','login','vote','admin'].includes(V)) sub = 'Practice · ' + (sub||'');
-  return `<div class="row spread"><div><div class="eyebrow">${esc(sub||'Backyard One-Dayer')}</div><h1>${esc(title)}</h1></div>
+  return `<div class="row spread"><div class="row" style="gap:14px;flex-wrap:nowrap;min-width:0"><a href="#" data-act="home" class="logo-link" aria-label="All matches">${LOGO('logo-sm','')}</a><div style="min-width:0"><div class="eyebrow">${esc(sub||'Backyard One-Dayer')}</div><h1>${esc(title)}</h1></div></div>
   <div class="row"><span id="savestate" class="savestate muted"></span>${V!=='home'?`<button class="ghost" data-act="home">All matches</button>`:''}</div></div>`;
 }
 
@@ -540,7 +543,7 @@ function drawQr(){
 function deviceId(){ let d = lsGet('deviceId'); if (!d) { d = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36); lsSet('deviceId', d); } return d; }
 function vVote(){
   const m = matches.map(x=>x.full).find(x => x && x.voting === 'open');
-  const head = `<div class="row spread"><div><div class="eyebrow">Backyard One-Dayer</div><h1>Players’ Player</h1></div><a class="btnlink ghost" href="#">Scores</a></div>`;
+  const head = `<div class="vote-head">${LOGO('logo-vote')}<h1>Players’ Player</h1><a class="btnlink ghost" href="#">See the scores</a></div>`;
   if (!loaded.matches) return head + '<div class="card"><p class="muted">Loading…</p></div>';
   if (!m) return head + `<div class="card"><p>Voting isn’t open right now. It opens at the end of the match.</p></div>`;
   const mine = (VOTES[m.id]||{})[deviceId()];
