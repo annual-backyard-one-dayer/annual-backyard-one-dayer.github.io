@@ -196,6 +196,19 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 .s-logo{display:flex;align-items:center;padding:6px 10px 6px 14px}
 .s-logo img{width:58px;height:58px;display:block}
 @media (max-width:640px){.s-logo{display:none}}
+
+.hero-photo{position:relative;border-radius:16px;overflow:hidden;height:clamp(220px,34vw,340px);background:var(--strip)}
+.hero-img{width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block}
+.hero-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,17,10,.82) 0%,rgba(6,17,10,.45) 34%,rgba(6,17,10,0) 60%)}
+.hero-logo{position:absolute;left:clamp(12px,3vw,32px);top:50%;transform:translateY(-50%);width:clamp(130px,22vw,230px);height:auto;z-index:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
+.cap{display:block;height:auto;flex:none}
+.cap-lg{width:76px} .cap-md{width:40px} .cap-sm{width:32px} .cap-xs{width:22px;display:inline-block;vertical-align:-5px;margin-right:6px}
+.tally-team{display:flex;align-items:center;gap:14px}
+.toss button{flex-direction:column;gap:8px}
+.toss .cap{width:64px;height:64px;object-fit:contain;padding:7px;background:#f2f6f3;border-radius:50%}
+.s-team{position:relative;padding-left:62px}
+.s-team .cap-strip{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:44px;height:44px;object-fit:contain;padding:5px;background:#f2f6f3;border-radius:50%}
+@media (max-width:640px){.cap-lg{width:52px}.tally-team{gap:8px}.s-team{padding-left:48px}.s-team .cap-strip{width:32px;height:32px;padding:3px;left:8px}}
 </style>
 </head>
 <body>
@@ -206,6 +219,6 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

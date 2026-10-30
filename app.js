@@ -180,7 +180,7 @@ function paintStrip(){
   $strip.hidden = false;
   $strip.innerHTML = `<div class="strip-in" role="status" aria-label="Live score">
     <div class="s-logo"><img src="img/logo-inverted.png" alt=""></div>
-    <div class="s-team ${team}"><span class="t">${esc(team)}</span><span class="sc">${f.wkts}/${f.runs}</span><span class="ov">${ord(inn.no)} inns · ${inn.complete ? 'complete' : 'over '+Math.max(overNo,1)}</span></div>
+    <div class="s-team ${team}">${CAP(team,'cap-strip')}<span class="t">${esc(team)}</span><span class="sc">${f.wkts}/${f.runs}</span><span class="ov">${ord(inn.no)} inns · ${inn.complete ? 'complete' : 'over '+Math.max(overNo,1)}</span></div>
     <div class="s-bat">${bats.length ? bats.map(b=>`<div class="ln"><span>${esc(b.name)}</span><span><b>${b.runs}${b.out?'':'*'}</b>${b.bk?`<span class="bl">(${b.balls})</span>`:''}</span></div>`).join('') : '<div class="ln"><span>Innings complete</span></div>'}</div>
     <div class="s-bowl"><span class="lab">Bowling</span><span class="fig">${bowler ? `${esc(bowler)} <b>${bf?bf.wkts:0}–${bf?bf.runs:0}</b> <span style="color:var(--strip-muted)">(${bf?bf.overs:0} ov)</span>` : '—'}</span></div>
     <div class="s-lead">${esc(leadText(team))}</div>
@@ -195,9 +195,11 @@ function render(){
   if (UI.focus) { const el = document.getElementById(UI.focus); if (el) el.focus(); UI.focus = null; }
   if (document.getElementById('qr')) drawQr();
 }
+const CAP = (team, cls='') => (team==='Green'||team==='Blue') ? `<img class="cap ${cls}" src="img/cap-${team.toLowerCase()}.png" alt="">` : '';
+const HERO = () => `<div class="hero-photo"><img class="hero-img" src="img/hero.jpg" alt="The green and blue caps on the stumps with the One Dayer shield"><img class="hero-logo" src="img/logo-inverted.png" alt="Annual Backyard One Dayer"></div>`;
 const LOGO = (cls, alt='Annual Backyard One Dayer') => `<picture class="${cls}"><source srcset="img/logo-inverted.png" media="(prefers-color-scheme: dark)"><img src="img/logo.png" alt="${alt}"></picture>`;
 function topbar(title, sub){
-  if (V === 'home') return `<div class="hero">${LOGO('logo-hero')}<div class="hero-right"><span id="savestate" class="savestate muted"></span></div></div>`;
+  if (V === 'home') return `${HERO()}<span id="savestate" class="savestate muted" style="align-self:flex-end;margin-top:-10px"></span>`;
   if (M && M.practice && !['home','login','vote','admin'].includes(V)) sub = 'Practice · ' + (sub||'');
   return `<div class="row spread"><div class="row" style="gap:14px;flex-wrap:nowrap;min-width:0"><a href="#" data-act="home" class="logo-link" aria-label="All matches">${LOGO('logo-sm','')}</a><div style="min-width:0"><div class="eyebrow">${esc(sub||'Backyard One-Dayer')}</div><h1>${esc(title)}</h1></div></div>
   <div class="row"><span id="savestate" class="savestate muted"></span>${V!=='home'?`<button class="ghost" data-act="home">All matches</button>`:''}</div></div>`;
@@ -215,12 +217,12 @@ function vHome(){
   ${needsSetup ? `<div class="notice warn row spread"><span>Finish setting up: publish the database rules and load your past matches.</span><button class="primary" data-act="view" data-v="admin">Finish setup</button></div>` : ''}
   ${done.length ? `<div class="card" style="gap:6px"><div class="eyebrow">Overall · ${done.length} matches</div>
       <div class="row" style="justify-content:center;gap:28px;flex-wrap:nowrap">
-        <div style="text-align:center"><div class="teamtag Green" style="font-size:20px">Green</div><div class="tnum tally" style="color:var(--green)">${w.Green}</div></div>
+        <div class="tally-team">${CAP('Green','cap-lg')}<div style="text-align:center"><div class="teamtag Green" style="font-size:20px">Green</div><div class="tnum tally" style="color:var(--green)">${w.Green}</div></div></div>
         <div style="font-family:var(--display);font-size:28px;color:var(--muted)">v</div>
-        <div style="text-align:center"><div class="teamtag Blue" style="font-size:20px">Blue</div><div class="tnum tally" style="color:var(--blue)">${w.Blue}</div></div>
+        <div class="tally-team"><div style="text-align:center"><div class="teamtag Blue" style="font-size:20px">Blue</div><div class="tnum tally" style="color:var(--blue)">${w.Blue}</div></div>${CAP('Blue','cap-lg')}</div>
       </div><div class="muted small" style="text-align:center">${w.Green===w.Blue?'All square':(w.Green>w.Blue?'Green':'Blue')+' lead the series'}${w.Tie?` · ${w.Tie} tied`:''}</div></div>` : ''}
   <div class="card"><div class="row spread"><h2>Matches</h2>${canWrite?`<div class="row"><button data-act="newpractice">Practice match</button><button class="primary big" data-act="newmatch">New match</button></div>`:''}</div>
-  ${UI.readDenied ? '<p class="muted">The database isn’t open yet. The scorer needs to finish setup.</p>' : !loaded.matches ? '<p class="muted">Loading matches…</p>' : list.length ? `<div class="mlist">${list.map(m=>{ const s = m.summary||''; return `<div class="mitem"><div><b style="font-family:var(--display);font-size:20px">${m.full&&m.full.practice?'Practice':'Match '+esc((m.full&&m.full.matchNo)||'')}</b> <span class="muted small">${esc(fmtDate(m.date))}</span><br>${/^(Green|Blue) won/.test(s) ? `<span class="teamtag ${s.split(' ')[0]}">${s.split(' ')[0]}</span> ${esc(s.slice(s.indexOf(' ')+1))}` : `<span class="small">${esc(s)}</span>`}</div>
+  ${UI.readDenied ? '<p class="muted">The database isn’t open yet. The scorer needs to finish setup.</p>' : !loaded.matches ? '<p class="muted">Loading matches…</p>' : list.length ? `<div class="mlist">${list.map(m=>{ const s = m.summary||''; return `<div class="mitem"><div><b style="font-family:var(--display);font-size:20px">${m.full&&m.full.practice?'Practice':'Match '+esc((m.full&&m.full.matchNo)||'')}</b> <span class="muted small">${esc(fmtDate(m.date))}</span><br>${/^(Green|Blue) won/.test(s) ? `${CAP(s.split(' ')[0],'cap-xs')}<span class="teamtag ${s.split(' ')[0]}">${s.split(' ')[0]}</span> ${esc(s.slice(s.indexOf(' ')+1))}` : `<span class="small">${esc(s)}</span>`}</div>
      <div class="row">${m.full&&m.full.practice?'<span class="pill debut">Practice</span>':''}${m.status==='live'&&!(m.full&&m.full.practice)?'<span class="pill">Live</span>':''}<button data-act="open" data-id="${esc(m.id)}">${m.status!=='complete'&&canWrite?'Continue':m.status!=='complete'?'Watch live':'View'}</button>
      ${canWrite && m.full && m.full.practice ? (UI.del===m.id ? `<span class="small">Delete it?</span><button class="danger" data-act="dodel" data-id="${esc(m.id)}">Delete</button><button class="ghost" data-act="nodel">Keep</button>` : `<button class="ghost" data-act="askdel" data-id="${esc(m.id)}">Delete</button>`) : ''}</div></div>`; }).join('')}</div>`
     : `<p class="muted">No matches yet.</p>`}
@@ -288,7 +290,7 @@ function vSetup(){
   const all = players.map(p=>p.name).concat(s.newp);
   const q = s.q.trim().toLowerCase();
   const shown = all.filter(n=>!q || n.toLowerCase().includes(q));
-  const box = t => { const l = teamList(t); return `<div class="teambox ${t}"><div class="row spread"><span class="teamtag ${t}" style="font-size:22px">${t}</span><span class="tnum">${l.length} players</span></div>
+  const box = t => { const l = teamList(t); return `<div class="teambox ${t}"><div class="row spread"><span class="row" style="gap:10px">${CAP(t,'cap-md')}<span class="teamtag ${t}" style="font-size:22px">${t}</span></span><span class="tnum">${l.length} players</span></div>
      <div class="small">${l.length ? l.map(n=>esc(n)+(s.newp.includes(n)?' <span class="pill debut">Debut</span>':'')).join(', ') : '<span class="muted">No one picked yet</span>'}</div>
      <div class="row spread"><span class="small">Wickets to bowl ${t} out</span>
        <span class="stepper"><button aria-label="Fewer wickets" data-act="wk" data-t="${t}" data-d="-1">−</button><span class="v tnum">${wkFor(t)}</span><button aria-label="More wickets" data-act="wk" data-t="${t}" data-d="1">+</button></span></div>
@@ -309,7 +311,7 @@ function vSetup(){
   </div>
   <div class="teams2">${box('Green')}${box('Blue')}</div>
   <div class="card"><h2>Coin toss</h2><p class="muted small">Who’s batting first?</p>
-    <div class="toss"><button class="Green ${s.toss==='Green'?'on':''}" data-act="toss" data-t="Green">Green bat</button><button class="Blue ${s.toss==='Blue'?'on':''}" data-act="toss" data-t="Blue">Blue bat</button></div>
+    <div class="toss"><button class="Green ${s.toss==='Green'?'on':''}" data-act="toss" data-t="Green">${CAP('Green','cap-md')}Green bat</button><button class="Blue ${s.toss==='Blue'?'on':''}" data-act="toss" data-t="Blue">${CAP('Blue','cap-md')}Blue bat</button></div>
     ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
     <div class="row"><button class="primary big" data-act="start">Start match</button></div>
   </div>`;
@@ -475,7 +477,7 @@ function vInningsDone(){
 /* ---- scorecard ---- */
 function cardHtml(inn){
   const f = innFigures(inn);
-  return `<div class="card"><div class="row spread"><h2><span class="teamtag ${inn.team}">${inn.team}</span> · ${ord(inn.no)} innings</h2><span class="tnum" style="font-family:var(--display);font-size:26px;font-weight:700">${f.wkts}/${f.runs}</span></div>
+  return `<div class="card"><div class="row spread"><h2 class="row" style="gap:10px">${CAP(inn.team,'cap-sm')}<span><span class="teamtag ${inn.team}">${inn.team}</span> · ${ord(inn.no)} innings</span></h2><span class="tnum" style="font-family:var(--display);font-size:26px;font-weight:700">${f.wkts}/${f.runs}</span></div>
   <div class="tablewrap"><table><thead><tr><th>#</th><th>Batter</th><th></th><th class="n">R</th><th class="n">B</th><th class="n">SR</th></tr></thead><tbody>
   ${f.bat.map(b=>`<tr><td class="tnum muted">${b.pos}</td><td>${esc(b.name)}</td><td class="howout">${esc(howText(b.out))}</td><td class="n"><b>${b.runs}</b></td><td class="n">${b.bk?b.balls:'–'}</td><td class="n">${b.bk&&b.balls?(b.runs/b.balls*100).toFixed(0):'–'}</td></tr>`).join('')}
   <tr class="tot"><td></td><td>Total</td><td class="howout">${f.overs==null?'':f.overs+' overs'}</td><td class="n">${f.runs}</td><td></td><td></td></tr></tbody></table></div>
@@ -517,7 +519,7 @@ function vAwards(){
     ${imp ? `<div class="bigmsg" style="padding:8px 0;text-align:left">${esc(imp.pick.name)}</div>
       ${imp.reason ? `<div class="notice warn small">${esc(imp.reason)}</div>` : ''}
       <div class="tablewrap"><table><thead><tr><th>Top three</th><th>Team</th><th>Contribution</th><th class="n">Points</th></tr></thead><tbody>
-      ${imp.top.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><span class="teamtag ${x.team}">${x.team}</span></td><td class="small">${esc(statLine(x))}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
+      ${imp.top.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${CAP(x.team,'cap-xs')}<span class="teamtag ${x.team}">${x.team}</span></span></td><td class="small">${esc(statLine(x))}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
       <p class="muted small">Points: 1 per run, a bonus for a big share of the innings, 10 for a fifty and 15 more for a hundred; 20 per wicket (plus 5 for a top-three batter or one already on 30+); 8 per catch, 10 per run out or stumping. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p>
       ${imp.incomplete ? '<p class="small notice warn">Some dismissals weren’t recorded for this match, so this pick is based on incomplete records.</p>' : ''}`
       : '<p class="muted">Available once the match is finished.</p>'}
@@ -543,7 +545,7 @@ function drawQr(){
 function deviceId(){ let d = lsGet('deviceId'); if (!d) { d = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36); lsSet('deviceId', d); } return d; }
 function vVote(){
   const m = matches.map(x=>x.full).find(x => x && x.voting === 'open');
-  const head = `<div class="vote-head">${LOGO('logo-vote')}<h1>Players’ Player</h1><a class="btnlink ghost" href="#">See the scores</a></div>`;
+  const head = `${HERO()}<div class="vote-head"><h1>Players’ Player</h1><a class="btnlink ghost" href="#">See the scores</a></div>`;
   if (!loaded.matches) return head + '<div class="card"><p class="muted">Loading…</p></div>';
   if (!m) return head + `<div class="card"><p>Voting isn’t open right now. It opens at the end of the match.</p></div>`;
   const mine = (VOTES[m.id]||{})[deviceId()];
