@@ -197,12 +197,10 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 .s-logo img{width:58px;height:58px;display:block}
 @media (max-width:640px){.s-logo{display:none}}
 
-.hero-photo{display:grid;grid-template-columns:minmax(0,1fr) auto;border-radius:16px;overflow:hidden;background:var(--strip);min-height:300px}
-.hero-brand{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px 16px;background:radial-gradient(circle at 50% 45%,#1f4a30 0%,var(--strip) 70%)}
-.hero-logo{width:clamp(150px,24vw,250px);height:auto;display:block}
-.hero-tag{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.16em;font-size:14px;color:var(--gold)}
-.hero-img{height:clamp(300px,40vw,440px);width:auto;aspect-ratio:920/1250;object-fit:cover;display:block}
-@media (max-width:640px){.hero-photo{min-height:0}.hero-brand{padding:12px 8px;gap:8px}.hero-logo{width:min(150px,36vw)}.hero-tag{font-size:11px;letter-spacing:.12em;text-align:center}.hero-img{height:250px}}
+.hero-photo{position:relative;border-radius:16px;overflow:hidden;background:#cfd8dc;aspect-ratio:1800/748;max-height:460px;width:100%}
+.hero-img{width:100%;height:100%;object-fit:cover;object-position:50% 60%;display:block}
+.hero-logo{position:absolute;left:3%;top:5%;width:19%;max-width:200px;height:auto;filter:drop-shadow(0 0 6px rgba(255,255,255,.9)) drop-shadow(0 0 2px rgba(255,255,255,.9))}
+@media (max-width:640px){.hero-photo{border-radius:12px}.hero-logo{width:24%}}
 </style>
 </head>
 <body>
@@ -213,6 +211,6 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
