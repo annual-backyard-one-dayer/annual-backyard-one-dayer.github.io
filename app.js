@@ -196,7 +196,7 @@ function render(){
   if (document.getElementById('qr')) drawQr();
 }
 const CAP = () => '';
-const HERO = () => `<div class="hero-photo"><img class="hero-img" src="img/hero.jpg" alt="A One Dayer match in progress on the backyard pitch"><img class="hero-logo" src="img/logo-inverted.png" alt="Annual Backyard One Dayer"></div>`;
+const HERO = () => `<div class="hero-photo"><img class="hero-img" src="img/hero-pitch.jpg" alt="A One Dayer match in progress on the backyard pitch"><img class="hero-logo" src="img/logo-inverted.png" alt="Annual Backyard One Dayer"></div>`;
 const LOGO = (cls, alt='Annual Backyard One Dayer') => `<picture class="${cls}"><source srcset="img/logo-inverted.png" media="(prefers-color-scheme: dark)"><img src="img/logo.png" alt="${alt}"></picture>`;
 function topbar(title, sub){
   if (V === 'home') return `${HERO()}<span id="savestate" class="savestate muted" style="align-self:flex-end;margin-top:-10px"></span>`;
