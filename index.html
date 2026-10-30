@@ -197,10 +197,11 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 .s-logo img{width:58px;height:58px;display:block}
 @media (max-width:640px){.s-logo{display:none}}
 
-.hero-photo{position:relative;border-radius:16px;overflow:hidden;background:#cfd8dc;aspect-ratio:1800/748;max-height:460px;width:100%}
-.hero-img{width:100%;height:100%;object-fit:cover;object-position:50% 60%;display:block}
-.hero-logo{position:absolute;left:3%;top:5%;width:19%;max-width:200px;height:auto;filter:drop-shadow(0 0 6px rgba(255,255,255,.9)) drop-shadow(0 0 2px rgba(255,255,255,.9))}
-@media (max-width:640px){.hero-photo{border-radius:12px}.hero-logo{width:24%}}
+.hero-photo{position:relative;border-radius:16px;overflow:hidden;background:#13291c;aspect-ratio:12/5;max-height:440px;width:100%}
+.hero-img{width:100%;height:100%;object-fit:cover;object-position:50% 50%;display:block}
+.hero-logo{position:absolute;left:4%;top:50%;transform:translateY(-50%);width:22%;max-width:230px;height:auto;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
+.hero-tag{position:absolute;right:4%;top:50%;transform:translateY(-50%);font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:clamp(18px,2.6vw,30px);line-height:1.1;color:#fff;text-align:right;text-shadow:0 2px 8px rgba(0,0,0,.55)}
+@media (max-width:640px){.hero-photo{aspect-ratio:16/10;border-radius:12px}.hero-logo{width:27%;left:3%}.hero-tag{display:none}}
 </style>
 </head>
 <body>
@@ -211,6 +212,6 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
