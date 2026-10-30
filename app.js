@@ -206,7 +206,7 @@ function vHome(){
   const open = matches.find(m => m.full && m.full.voting === 'open');
   const done = matches.filter(m=>m.full && !m.full.practice && m.status==='complete');
   const w = {Green:0, Blue:0, Tie:0}; done.forEach(m => { try { w[withMatch(m.full, result).winner]++; } catch(e) {} });
-  const needsSetup = canWrite && loaded.players && loaded.matches && (!players.length || !done.length);
+  const needsSetup = canWrite && (UI.readDenied || (loaded.players && loaded.matches && (!players.length || !done.length)));
   return `${topbar('One-Dayer Scorer')}
   ${open ? `<div class="notice good row spread"><span><b>Players’ Player voting is open</b> for ${open.full.practice?'the practice match':'Match '+esc(open.full.matchNo)}.</span><a class="btnlink primary" href="#vote">Vote now</a></div>` : ''}
   ${needsSetup ? `<div class="notice warn row spread"><span>Finish setting up: publish the database rules and load your past matches.</span><button class="primary" data-act="view" data-v="admin">Finish setup</button></div>` : ''}
@@ -217,7 +217,7 @@ function vHome(){
         <div style="text-align:center"><div class="teamtag Blue" style="font-size:20px">Blue</div><div class="tnum tally" style="color:var(--blue)">${w.Blue}</div></div>
       </div><div class="muted small" style="text-align:center">${w.Green===w.Blue?'All square':(w.Green>w.Blue?'Green':'Blue')+' lead the series'}${w.Tie?` · ${w.Tie} tied`:''}</div></div>` : ''}
   <div class="card"><div class="row spread"><h2>Matches</h2>${canWrite?`<div class="row"><button data-act="newpractice">Practice match</button><button class="primary big" data-act="newmatch">New match</button></div>`:''}</div>
-  ${!loaded.matches ? '<p class="muted">Loading matches…</p>' : list.length ? `<div class="mlist">${list.map(m=>{ const s = m.summary||''; return `<div class="mitem"><div><b style="font-family:var(--display);font-size:20px">${m.full&&m.full.practice?'Practice':'Match '+esc((m.full&&m.full.matchNo)||'')}</b> <span class="muted small">${esc(fmtDate(m.date))}</span><br>${/^(Green|Blue) won/.test(s) ? `<span class="teamtag ${s.split(' ')[0]}">${s.split(' ')[0]}</span> ${esc(s.slice(s.indexOf(' ')+1))}` : `<span class="small">${esc(s)}</span>`}</div>
+  ${UI.readDenied ? '<p class="muted">The database isn’t open yet. The scorer needs to finish setup.</p>' : !loaded.matches ? '<p class="muted">Loading matches…</p>' : list.length ? `<div class="mlist">${list.map(m=>{ const s = m.summary||''; return `<div class="mitem"><div><b style="font-family:var(--display);font-size:20px">${m.full&&m.full.practice?'Practice':'Match '+esc((m.full&&m.full.matchNo)||'')}</b> <span class="muted small">${esc(fmtDate(m.date))}</span><br>${/^(Green|Blue) won/.test(s) ? `<span class="teamtag ${s.split(' ')[0]}">${s.split(' ')[0]}</span> ${esc(s.slice(s.indexOf(' ')+1))}` : `<span class="small">${esc(s)}</span>`}</div>
      <div class="row">${m.full&&m.full.practice?'<span class="pill debut">Practice</span>':''}${m.status==='live'&&!(m.full&&m.full.practice)?'<span class="pill">Live</span>':''}<button data-act="open" data-id="${esc(m.id)}">${m.status!=='complete'&&canWrite?'Continue':m.status!=='complete'?'Watch live':'View'}</button>
      ${canWrite && m.full && m.full.practice ? (UI.del===m.id ? `<span class="small">Delete it?</span><button class="danger" data-act="dodel" data-id="${esc(m.id)}">Delete</button><button class="ghost" data-act="nodel">Keep</button>` : `<button class="ghost" data-act="askdel" data-id="${esc(m.id)}">Delete</button>`) : ''}</div></div>`; }).join('')}</div>`
     : `<p class="muted">No matches yet.</p>`}
@@ -708,7 +708,8 @@ window.addEventListener('hashchange', route);
     if (!u && ['setup','openers','score','admin'].includes(V)) { V = M ? 'card' : 'home'; }
     render();
   });
-  db.ref('players').on('value', s => { players = arr(s.val()); loaded.players = true; if (['home','admin'].includes(V)) render(); });
+  const denied = () => { loaded.players = loaded.matches = true; UI.readDenied = true; render(); };
+  db.ref('players').on('value', s => { players = arr(s.val()); loaded.players = true; if (['home','admin'].includes(V)) render(); }, denied);
   db.ref('matches').on('value', s => {
     const all = s.val() || {};
     const keepId = (M && canWrite && ['setup','openers','score'].includes(V)) ? M.id : null;
@@ -720,6 +721,6 @@ window.addEventListener('hashchange', route);
     matches = next; loaded.matches = true;
     if (M && M.id !== keepId) { const fresh = matches.find(x=>x.id===M.id); if (fresh) { M = clone(fresh.full); normalize(M); } }
     if (['home','card','vote','awards','admin'].includes(V)) render();
-  });
-  db.ref('votes').on('value', s => { VOTES = s.val() || {}; if (['awards','vote'].includes(V)) render(); });
+  }, denied);
+  db.ref('votes').on('value', s => { VOTES = s.val() || {}; if (['awards','vote'].includes(V)) render(); }, () => {});
 })();
