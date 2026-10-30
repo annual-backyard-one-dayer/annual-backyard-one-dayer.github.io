@@ -195,8 +195,8 @@ function render(){
   if (UI.focus) { const el = document.getElementById(UI.focus); if (el) el.focus(); UI.focus = null; }
   if (document.getElementById('qr')) drawQr();
 }
-const CAP = (team, cls='') => (team==='Green'||team==='Blue') ? `<img class="cap ${cls}" src="img/cap-${team.toLowerCase()}.png" alt="">` : '';
-const HERO = () => `<div class="hero-photo"><img class="hero-img" src="img/hero.jpg" alt="The green and blue caps on the stumps with the One Dayer shield"><img class="hero-logo" src="img/logo-inverted.png" alt="Annual Backyard One Dayer"></div>`;
+const CAP = () => '';
+const HERO = () => `<div class="hero-photo"><div class="hero-brand"><img class="hero-logo" src="img/logo-inverted.png" alt="Annual Backyard One Dayer"><span class="hero-tag">Playing for the shield</span></div><img class="hero-img" src="img/hero.jpg" alt="The green and blue caps on the stumps above the One Dayer shield"></div>`;
 const LOGO = (cls, alt='Annual Backyard One Dayer') => `<picture class="${cls}"><source srcset="img/logo-inverted.png" media="(prefers-color-scheme: dark)"><img src="img/logo.png" alt="${alt}"></picture>`;
 function topbar(title, sub){
   if (V === 'home') return `${HERO()}<span id="savestate" class="savestate muted" style="align-self:flex-end;margin-top:-10px"></span>`;
