@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>One-Dayer Scorer</title>
+<meta name="description" content="Live scoring, scorecards and awards for the Backyard One-Dayer.">
+<meta name="theme-color" content="#0f2418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="One-Dayer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+
+/* Layout: one working column (setup / over entry / scorecard) with a TV-style score strip pinned to the bottom edge */
+:root{
+  --bg:#ecefec; --surface:#ffffff; --surface-2:#f5f7f5; --ink:#16201a; --muted:#58665d; --line:#d3dbd5;
+  --turf:#1d5c39; --turf-ink:#ffffff; --green:#2b7a47; --green-soft:#dcefe2; --blue:#2360a5; --blue-soft:#dde9f7;
+  --danger:#b0271f; --danger-soft:#fbe7e5; --warn:#8a5a00; --warn-soft:#fbf0d6;
+  --strip:#0f2418; --strip-2:#173322; --strip-ink:#f2f6f3; --strip-muted:#a9bfb1; --gold:#e7c24a;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif; --body:"Barlow","Segoe UI",Arial,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1410; --surface:#151f19; --surface-2:#1b2720; --ink:#e7eee9; --muted:#9db0a3; --line:#2a3a30;
+  --turf:#3f9e68; --turf-ink:#06140c; --green:#4aa76c; --green-soft:#183323; --blue:#5b93d8; --blue-soft:#162a42;
+  --danger:#ff8a80; --danger-soft:#3a1714; --warn:#f0c060; --warn-soft:#33270d;
+  --strip:#06110a; --strip-2:#0f2016; --strip-ink:#eef4f0; --strip-muted:#8fa898; --gold:#f0cf5a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1410; --surface:#151f19; --surface-2:#1b2720; --ink:#e7eee9; --muted:#9db0a3; --line:#2a3a30;
+  --turf:#3f9e68; --turf-ink:#06140c; --green:#4aa76c; --green-soft:#183323; --blue:#5b93d8; --blue-soft:#162a42;
+  --danger:#ff8a80; --danger-soft:#3a1714; --warn:#f0c060; --warn-soft:#33270d;
+  --strip:#06110a; --strip-2:#0f2016; --strip-ink:#eef4f0; --strip-muted:#8fa898; --gold:#f0cf5a; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;display:flex;flex-direction:column;min-height:100vh}
+main{flex:1;width:100%;max-width:980px;margin:0 auto;padding-block:20px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:34px;line-height:1.05} h2{font-size:24px} h3{font-size:19px}
+.eyebrow{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.12em;font-size:13px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.muted{color:var(--muted)} .small{font-size:14px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:9px 14px;font-weight:500;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+button:hover{border-color:var(--muted)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--turf);outline-offset:2px}
+button.primary{background:var(--turf);color:var(--turf-ink);border-color:var(--turf);font-weight:600}
+button.danger{color:var(--danger);border-color:var(--danger)}
+button.ghost{border-color:transparent;background:transparent}
+button.big{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.03em;padding:12px 22px;text-transform:uppercase}
+select,input[type=text],input[type=date],input[type=number]{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;min-width:0}
+select{padding-right:28px}
+label.field{display:flex;flex-direction:column;gap:5px;font-size:14px;color:var(--muted);min-width:0}
+label.field>*{color:var(--ink)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.pill.debut{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pill.g{background:var(--green-soft);color:var(--green);border-color:transparent}
+.pill.b{background:var(--blue-soft);color:var(--blue);border-color:transparent}
+.notice{border-radius:var(--r);padding:10px 14px;font-size:15px}
+.notice.warn{background:var(--warn-soft);color:var(--warn)}
+.notice.bad{background:var(--danger-soft);color:var(--danger)}
+.notice.good{background:var(--green-soft);color:var(--green)}
+.err{color:var(--danger);font-size:14px}
+.tnum{font-variant-numeric:tabular-nums}
+.teamtag{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.teamtag.Green{color:var(--green)} .teamtag.Blue{color:var(--blue)}
+
+/* setup */
+.pick{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center}
+.pick .nm{display:flex;gap:8px;align-items:center;min-width:0;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.seg button{border:0;border-radius:0;padding:7px 14px;background:var(--surface)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on.Green{background:var(--green);color:#fff}
+.seg button.on.Blue{background:var(--blue);color:#fff}
+.teams2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.teambox{border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.teambox.Green{background:var(--green-soft)} .teambox.Blue{background:var(--blue-soft)}
+.stepper{display:inline-flex;align-items:center;gap:6px}
+.stepper button{width:38px;height:38px;padding:0;font-size:20px}
+.stepper .v{min-width:34px;text-align:center;font-family:var(--display);font-size:26px;font-weight:700}
+.listscroll{max-height:380px;overflow-y:auto;padding-right:4px}
+.toss{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toss button{padding:16px;font-family:var(--display);font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.toss button.on.Green{background:var(--green);color:#fff;border-color:var(--green)}
+.toss button.on.Blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* over entry */
+.overhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.lines{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:10px 14px;align-items:center}
+.lines .hd{font-size:13px;color:var(--muted);font-weight:500}
+.lines .hd.c{text-align:center}
+.bname{font-weight:600;font-size:17px;display:flex;flex-direction:column;min-width:0}
+.bname .sub{font-weight:400;font-size:13px;color:var(--muted)}
+.bname.out{color:var(--muted)}
+.cnt{display:flex;align-items:center;justify-content:center;gap:6px}
+.cnt button{width:42px;height:42px;padding:0;font-size:22px;border-radius:10px}
+.cnt input{width:58px;text-align:center;font-family:var(--display);font-size:26px;font-weight:700;padding:4px 2px}
+.cnt input.balls{font-size:22px;font-weight:600;color:var(--muted)}
+.cnt input::-webkit-outer-spin-button,.cnt input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.cnt input{-moz-appearance:textfield;appearance:textfield}
+.quick{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.quick button{padding:3px 9px;font-size:13px;border-radius:7px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.actions .push{margin-left:auto}
+.wpanel{border:2px solid var(--danger);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--danger-soft)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.confirm{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface-2);border-radius:var(--r);padding:10px 12px}
+
+/* tables */
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:13px;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.tot td{font-weight:600;border-bottom:0}
+.howout{color:var(--muted);font-size:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* home list */
+.mlist{display:flex;flex-direction:column;gap:8px}
+.mitem{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+
+/* potm */
+.votegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.votegrid button{padding:16px 10px;font-size:17px;font-weight:600}
+.votegrid button.Green{border-left:5px solid var(--green)} .votegrid button.Blue{border-left:5px solid var(--blue)}
+.bigmsg{font-family:var(--display);font-size:30px;font-weight:700;text-align:center;padding:24px 10px}
+.bar{height:12px;border-radius:6px;background:var(--turf)}
+
+/* TV strip */
+.strip{position:sticky;bottom:0;z-index:5;background:var(--strip);color:var(--strip-ink);padding-bottom:env(safe-area-inset-bottom,0px);border-top:3px solid var(--gold)}
+.strip-in{max-width:1180px;margin:0 auto;display:flex;align-items:stretch;flex-wrap:wrap;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.s-team{padding:10px 18px;display:flex;flex-direction:column;justify-content:center;min-width:132px}
+.s-team.Green{background:var(--green)} .s-team.Blue{background:var(--blue)}
+.s-team .t{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.14em;font-size:14px;color:#fff}
+.s-team .sc{font-family:var(--display);font-weight:700;font-size:38px;line-height:1;color:#fff;font-variant-numeric:tabular-nums}
+.s-team .ov{font-size:12px;color:rgba(255,255,255,.85)}
+.s-bat{flex:1;min-width:220px;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:8px 18px}
+.s-bat .ln{display:flex;justify-content:space-between;gap:12px;font-size:17px;font-variant-numeric:tabular-nums}
+.s-bat .ln b{font-family:var(--display);font-size:22px;font-weight:700}
+.s-bat .ln .bl{color:var(--strip-muted);font-size:14px;margin-left:6px}
+.s-bowl{background:var(--strip-2);padding:8px 18px;display:flex;flex-direction:column;justify-content:center;min-width:180px}
+.s-bowl .lab{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--strip-muted)}
+.s-bowl .fig{font-size:17px;font-variant-numeric:tabular-nums}
+.s-bowl .fig b{font-family:var(--display);font-size:22px;font-weight:700;color:var(--gold)}
+.s-lead{padding:8px 18px;display:flex;align-items:center;font-family:var(--display);font-weight:700;font-size:21px;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);min-width:170px}
+.savestate{font-size:13px}
+@media (max-width:640px){
+  h1{font-size:28px}
+  .lines{grid-template-columns:minmax(0,1fr) auto auto;gap:8px}
+  .cnt button{width:36px;height:36px}
+  .cnt input{width:46px}
+  .s-team{min-width:110px;padding:8px 12px} .s-team .sc{font-size:30px}
+  .s-bat,.s-bowl,.s-lead{padding:6px 12px}
+  .s-lead{font-size:17px;width:100%;justify-content:center}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+
+.tally{font-family:var(--display);font-weight:700;font-size:56px;line-height:1}
+a.btnlink{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:var(--r);padding:9px 14px;font-weight:600;text-decoration:none;color:var(--ink);background:var(--surface)}
+a.btnlink.primary{background:var(--turf);color:var(--turf-ink);border-color:var(--turf)}
+a.btnlink.ghost{border-color:transparent;background:transparent;font-weight:500}
+.awards{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}
+.award{flex:1;min-width:200px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:2px}
+.award b{font-family:var(--display);font-size:26px;font-weight:700}
+.awards>button{align-self:center}
+.qrwrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+#qr{background:#fff;padding:10px;border-radius:10px;line-height:0}
+.votegrid button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+input[type=email],input[type=password]{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;min-width:0}
+textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;color:var(--ink)}
+
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite"><div class="card"><h1>One-Dayer Scorer</h1><p class="muted">Loading the scorebook…</p></div></main>
+<div class="strip" id="strip" hidden></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
