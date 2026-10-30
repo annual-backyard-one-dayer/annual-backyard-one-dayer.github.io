@@ -268,6 +268,7 @@ async function importHistory(){
     Object.values(seed.matches).forEach(m => upd['matches/'+m.id] = m);
     await db.ref().update(upd);
     UI.imp = {t:`Done: ${Object.keys(seed.matches).length} matches and ${seed.players.length} players loaded.`};
+    loaded.players = loaded.matches = false; subscribe();
   } catch(e) {
     UI.imp = {bad:1, t: /permission/i.test(String(e && e.message)) ? 'Firebase refused the save. Publish the database rules in step 1 first, then try again.' : 'Something went wrong loading the history. Check the internet connection and try again.'};
   }
@@ -696,18 +697,9 @@ document.addEventListener('keydown', e => {
 function route(){ if (location.hash === '#vote') { V = 'vote'; M = null; } else if (V === 'vote') V = 'home'; render(); }
 window.addEventListener('hashchange', route);
 
-/* ---------------- boot ---------------- */
-(function boot(){
-  if (location.hash === '#vote') V = 'vote';
-  render();
-  if (typeof firebase === 'undefined') { $app.insertAdjacentHTML('afterbegin', '<div class="notice bad">Couldn’t reach the scoring service. Check the internet connection and reload.</div>'); return; }
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.database(); auth = firebase.auth();
-  auth.onAuthStateChanged(u => {
-    me = u; canWrite = !!u;
-    if (!u && ['setup','openers','score','admin'].includes(V)) { V = M ? 'card' : 'home'; }
-    render();
-  });
+function subscribe(){
+  ['players','matches','votes'].forEach(k => db.ref(k).off());
+  UI.readDenied = false;
   const denied = () => { loaded.players = loaded.matches = true; UI.readDenied = true; render(); };
   db.ref('players').on('value', s => { players = arr(s.val()); loaded.players = true; if (['home','admin'].includes(V)) render(); }, denied);
   db.ref('matches').on('value', s => {
@@ -723,4 +715,19 @@ window.addEventListener('hashchange', route);
     if (['home','card','vote','awards','admin'].includes(V)) render();
   }, denied);
   db.ref('votes').on('value', s => { VOTES = s.val() || {}; if (['awards','vote'].includes(V)) render(); }, () => {});
+}
+
+/* ---------------- boot ---------------- */
+(function boot(){
+  if (location.hash === '#vote') V = 'vote';
+  render();
+  if (typeof firebase === 'undefined') { $app.insertAdjacentHTML('afterbegin', '<div class="notice bad">Couldn’t reach the scoring service. Check the internet connection and reload.</div>'); return; }
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database(); auth = firebase.auth();
+  auth.onAuthStateChanged(u => {
+    me = u; canWrite = !!u; if (db) subscribe();
+    if (!u && ['setup','openers','score','admin'].includes(V)) { V = M ? 'card' : 'home'; }
+    render();
+  });
+  subscribe();
 })();
