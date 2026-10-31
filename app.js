@@ -613,24 +613,30 @@ function vVote(){
 /* ---- honour's board ---- */
 function honoursData(){
   const done = matches.filter(m=>m.full && !m.full.practice && m.status==='complete').map(m=>m.full).sort((a,b)=>(+a.matchNo)-(+b.matchNo));
-  const H = {pom:{}, pts:{}, apps:{}, tons:{}, fifties:{}, thirties:{}, ducks:{}, three:{}, six:{}, games:{}, inns:{}, wk:{}, pairs:{}, scores:[]};
+  const H = {pom:{}, pts:{}, apps:{}, tons:{}, fifties:{}, thirties:{}, ducks:{}, three:{}, six:{}, games:{}, inns:{}, wk:{}, pairs:{}, scores:[], two:{}};
   const push = (o, n, v) => (o[n] = o[n] || []).push(v);
+  H.teamInns = []; H.wkFirst = {}; H.wkLast = {}; H.bestDay = {}; H.results = [];
   done.forEach(m => withMatch(m, () => {
+    const maxNo = Math.max(...m.innings.map(i=>i.no));
     const imp = impact(m);
     if (imp) { push(H.pom, imp.pick.name, m); (imp.ranked||[]).forEach(x => H.pts[x.name] = (H.pts[x.name]||0) + x.pts); }
     ['Green','Blue'].forEach(t => m.teams[t].forEach(n => { H.apps[n] = (H.apps[n]||0) + 1; push(H.games, n, m); }));
     const day = {};
     m.innings.forEach(inn => { const f = innFigures(inn);
+      const role = inn.no === 1 ? 'first' : '', last = inn.no === maxNo, setting = last && inn.team === m.battingFirst, chasing = last && inn.team !== m.battingFirst;
+      H.teamInns.push({m, team:inn.team, no:inn.no, runs:f.runs, wkts:f.wkts, last, first: inn.no === 1});
       f.bat.forEach(b => {
-        const rec = {m, v:b.runs, no:!b.out, team:inn.team, inn:inn.no};
+        const rec = {m, v:b.runs, no:!b.out, team:inn.team, inn:inn.no, first: inn.no === 1, setting, chasing};
         push(H.inns, b.name, rec); H.scores.push({name:b.name, ...rec});
         if (b.runs >= 100) push(H.tons, b.name, rec); else if (b.runs >= 50) push(H.fifties, b.name, rec); else if (b.runs >= 30) push(H.thirties, b.name, rec);
         if (b.runs === 0 && b.out) push(H.ducks, b.name, rec);
         const o = b.out; if (o && o.bowler && o.how !== 'Run out' && o.how !== 'Unknown') { const k = o.bowler + '|' + b.name; H.pairs[k] = (H.pairs[k]||0) + 1; }
       });
-      f.bowl.forEach(b => { if (b.wkts >= 3) push(H.three, b.name, {m, v:b.wkts}); day[b.name] = (day[b.name]||0) + b.wkts; const w = H.wk[b.name] = H.wk[b.name] || {w:0, best:0, bestM:null}; w.w += b.wkts; if (b.wkts > w.best) { w.best = b.wkts; w.bestM = m; } });
+      f.bowl.forEach(b => { if (inn.no === 1) H.wkFirst[b.name] = (H.wkFirst[b.name]||0) + b.wkts; if (last) H.wkLast[b.name] = (H.wkLast[b.name]||0) + b.wkts; if (b.wkts === 2) push(H.two = H.two || {}, b.name, {m, v:2}); if (b.wkts >= 3) push(H.three, b.name, {m, v:b.wkts}); day[b.name] = (day[b.name]||0) + b.wkts; const w = H.wk[b.name] = H.wk[b.name] || {w:0, best:0, bestM:null}; w.w += b.wkts; if (b.wkts > w.best) { w.best = b.wkts; w.bestM = m; } });
     });
     Object.entries(day).forEach(([n,w]) => { if (w >= 6) push(H.six, n, {m, v:w}); });
+    Object.entries(day).forEach(([n,w]) => { if (!H.bestDay[n] || w > H.bestDay[n].v) H.bestDay[n] = {m, v:w}; });
+    H.results.push({m, r: result()});
   }));
   return {done, H};
 }
@@ -642,6 +648,20 @@ function tallyTable(title, intro, obj, head, fmt){
   return `<div class="card"><h2>${title}</h2>${intro?`<p class="muted small">${intro}</p>`:''}
     ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">${head}</th><th>When</th></tr></thead><tbody>
     ${rows.map(([n,l],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td><b>${esc(n)}</b></td><td class="n"><b>${l.length}</b></td><td class="small">${l.map(x=>yearLink(x.m, `${x.m.year}: ${fmt(x)}`, 'openmatch')).join(' ')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None yet.</p>'}</div>`;
+}
+function avgRows(H, filt, minInns){
+  return Object.entries(H.inns).map(([n,l]) => { const k = l.filter(filt); const runs = k.reduce((a,x)=>a+x.v,0), no = k.filter(x=>x.no).length, outs = k.length - no;
+    const hs = k.length ? k.reduce((a,x)=>x.v>a.v||(x.v===a.v&&x.no)?x:a, k[0]) : null;
+    return {n, runs, inns:k.length, no, outs, avg: outs ? runs/outs : null, hs}; }).filter(r => r.inns >= minInns && r.avg != null).sort((a,b)=>b.avg-a.avg);
+}
+function avgTable(title, intro, rows){
+  return `<div class="card"><h2>${title}</h2><p class="muted small">${intro}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Average</th><th class="n">Runs</th><th class="n">Inns</th><th class="n">NO</th><th class="n">Best</th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr><td class="tnum muted">${i+1}</td><td>${esc(r.n)}</td><td class="n"><b>${r.avg.toFixed(2)}</b></td><td class="n">${r.runs}</td><td class="n">${r.inns}</td><td class="n">${r.no}</td><td class="n">${r.hs?yearLink(r.hs.m, `${r.hs.v}${r.hs.no?'*':''}`, 'openmatch'):'–'}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No one qualifies yet.</td></tr>'}</tbody></table></div></div>`;
+}
+function countTable(title, intro, obj, head){
+  const rows = Object.entries(obj).filter(([n,v])=>v>0).sort((a,b)=>b[1]-a[1]); const rk = rankCells(rows, r=>r[1]);
+  return `<div class="card"><h2>${title}</h2>${intro?`<p class="muted small">${intro}</p>`:''}<div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">${head}</th></tr></thead><tbody>
+    ${rows.map(([n,v],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${v}</b></td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function vHonours(){
   const {done, H} = honoursData();
@@ -670,11 +690,17 @@ function vHonours(){
       inner = `<div class="card"><h2>Highest Scores</h2><p class="muted small">The top 25 individual innings. * = not out.</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Score</th><th>Team</th><th>Match</th></tr></thead><tbody>
         ${rows.map((r,i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(r.name)}</td><td class="n"><b>${r.v}${r.no?'*':''}</b></td><td><span class="teamtag ${r.team}">${r.team}</span></td><td>${yearLink(r.m, `${r.m.year} · ${ord(r.inn)} inns`, 'openmatch')}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
+    if (sub === 'b_avg') inner = avgTable('Batting Average', 'Runs divided by times out. Minimum 5 innings.', avgRows(H, x=>true, 5));
+    if (sub === 'b_no') { const o = {}; Object.entries(H.inns).forEach(([n,l]) => o[n] = l.filter(x=>x.no).length); inner = countTable('Most Not Outs', 'Innings finished not out.', o, 'Not outs'); }
+    if (sub === 'b_first') inner = avgTable('1st Innings Average', 'Average in each side’s first innings of the match. Minimum 3 innings.', avgRows(H, x=>x.first, 3));
+    if (sub === 'b_set') inner = avgTable('Setting Innings Average', 'Average in the last innings of the side batting first, when they’re setting the target. Minimum 3 innings.', avgRows(H, x=>x.setting, 3));
+    if (sub === 'b_chase') inner = avgTable('Chasing Innings Average', 'Average in the last innings of the side batting second, when they’re chasing. Minimum 3 innings.', avgRows(H, x=>x.chasing, 3));
+    if (sub === 'b_10') inner = avgTable('Average When 10+', 'Average counting only innings of 10 or more, which shows how big a player goes once they’re in. Minimum 5 such innings.', avgRows(H, x=>x.v>=10, 5));
     if (sub === 'b_tons') inner = tallyTable('Centuries', '', H.tons, 'Hundreds', x => x.v + (x.no?'*':''));
     if (sub === 'b_fifties') inner = tallyTable('Fifties', 'Scores of 50 to 99. Hundreds are on the Centuries tab.', H.fifties, 'Fifties', x => x.v + (x.no?'*':''));
     if (sub === 'b_thirties') inner = tallyTable('Most 30s', 'Scores of 30 to 49.', H.thirties, '30s', x => x.v + (x.no?'*':''));
     if (sub === 'b_ducks') inner = tallyTable('Most Ducks', 'Out for 0 (not-out zeros don’t count).', H.ducks, 'Ducks', x => `${ord(x.inn)} inns`);
-    body = `<div class="tabs subtabs">${ST('b_runs','Most Total Runs')}${ST('b_high','Highest Scores')}${ST('b_tons','Centuries')}${ST('b_fifties','Fifties')}${ST('b_thirties','Most 30s')}${ST('b_ducks','Most Ducks')}</div>${inner}`;
+    body = `<div class="tabs subtabs">${ST('b_runs','Most Total Runs')}${ST('b_avg','Batting Average')}${ST('b_high','Highest Scores')}${ST('b_tons','Centuries')}${ST('b_fifties','Fifties')}${ST('b_thirties','Most 30s')}${ST('b_ducks','Most Ducks')}${ST('b_no','Most Not Outs')}${ST('b_first','1st Innings Average')}${ST('b_set','Setting Innings Average')}${ST('b_chase','Chasing Innings Average')}${ST('b_10','Average When 10+')}</div>${inner}`;
   }
   if (tab === 'bowl') {
     sub = UI.hsub && UI.hsub.startsWith('w_') ? UI.hsub : 'w_total';
@@ -685,6 +711,12 @@ function vHonours(){
       inner = `<div class="card"><h2>Most Total Wickets</h2><p class="muted small">${note}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Wickets</th><th class="n">3-wkt inns</th><th class="n">Best innings</th></tr></thead><tbody>
         ${rows.map(([n,w],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${w.w}</b></td><td class="n">${(H.three[n]||[]).length}</td><td class="n">${w.bestM?yearLink(w.bestM, `${w.best} wkts`, 'openmatch'):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
+    if (sub === 'w_two') inner = tallyTable('2 Wicket Innings', 'Exactly two wickets in an innings. ' + note, H.two, 'Times', x => `${x.v} wkts`);
+    if (sub === 'w_firstinn') inner = countTable('1st Innings Wickets', 'Wickets taken in each side’s first innings. ' + note, H.wkFirst, 'Wickets');
+    if (sub === 'w_lastinn') inner = countTable('Last Innings Wickets', 'Wickets taken in the final innings, when the match is decided. ' + note, H.wkLast, 'Wickets');
+    if (sub === 'w_day') { const rows = Object.entries(H.bestDay).filter(([n,x])=>x.v>0).sort((a,b)=>b[1].v-a[1].v); const rk = rankCells(rows, r=>r[1].v);
+      inner = `<div class="card"><h2>Most Wickets in a Day</h2><p class="muted small">Each player’s best match haul. ${note}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Wickets</th><th class="n">Match</th></tr></thead><tbody>
+        ${rows.map(([n,x],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${x.v}</b></td><td class="n">${yearLink(x.m, String(x.m.year), 'openmatch')}</td></tr>`).join('')}</tbody></table></div></div>`; }
     if (sub === 'w_three') inner = tallyTable('3 Wicket Innings', 'Three or more wickets in a single innings. ' + note, H.three, 'Times', x => `${x.v} wkts`);
     if (sub === 'w_six') inner = tallyTable('6 Wicket Days', 'Six or more wickets across a whole match. ' + note, H.six, 'Times', x => `${x.v} wkts`);
     if (sub === 'w_h2h') {
@@ -697,7 +729,30 @@ function vHonours(){
         ${who ? `<div class="grid2">${tbl(`${esc(who)} has dismissed`, pairs.filter(x=>x.bw===who).sort((a,b)=>b.c-a.c), 'Batter', '', 'bt', '')}${tbl(`${esc(who)} has been dismissed by`, pairs.filter(x=>x.bt===who).sort((a,b)=>b.c-a.c), 'Bowler', '', 'bw', '')}</div>`
           : tbl('Most frequent match-ups', pairs.filter(x=>x.c>=2).sort((a,b)=>b.c-a.c), 'Bowler', 'Batter', 'bw', 'bt')}</div>`;
     }
-    body = `<div class="tabs subtabs">${ST('w_total','Most Total Wickets')}${ST('w_three','3 Wicket Innings')}${ST('w_six','6 Wicket Days')}${ST('w_h2h','Dismissals')}</div>${inner}`;
+    body = `<div class="tabs subtabs">${ST('w_total','Most Total Wickets')}${ST('w_day','Most Wickets in a Day')}${ST('w_two','2 Wicket Innings')}${ST('w_three','3 Wicket Innings')}${ST('w_six','6 Wicket Days')}${ST('w_firstinn','1st Innings Wickets')}${ST('w_lastinn','Last Innings Wickets')}${ST('w_h2h','Dismissals')}</div>${inner}`;
+  }
+  if (tab === 'team') {
+    sub = UI.hsub && UI.hsub.startsWith('t_') ? UI.hsub : 't_sum';
+    const TI = H.teamInns, tr = (list, cols) => list.map((x,i)=>`<tr><td class="tnum muted">${i+1}</td><td><span class="teamtag ${x.team}">${x.team}</span></td><td class="n"><b>${x.wkts}/${x.runs}</b></td><td>${yearLink(x.m, `${x.m.year} · ${ord(x.no)} inns`, 'openmatch')}</td></tr>`).join('');
+    const tbl = (title, intro, list) => `<div class="card"><h2>${title}</h2>${intro?`<p class="muted small">${intro}</p>`:''}<div class="tablewrap"><table><thead><tr><th>#</th><th>Team</th><th class="n">Score</th><th>Match</th></tr></thead><tbody>${tr(list)}</tbody></table></div></div>`;
+    let inner = '';
+    if (sub === 't_sum') { const t = {Green:{runs:0,inns:0,first:0,firstN:0,last:0,lastN:0,wins:0}, Blue:{runs:0,inns:0,first:0,firstN:0,last:0,lastN:0,wins:0}};
+      TI.forEach(x => { const o = t[x.team]; o.runs += x.runs; o.inns++; if (x.first) { o.first += x.runs; o.firstN++; } if (x.last) { o.last += x.runs; o.lastN++; } });
+      H.results.forEach(x => { if (t[x.r.winner]) t[x.r.winner].wins++; });
+      const row = (lab, f) => `<tr><td>${lab}</td><td class="n"><b>${f(t.Green)}</b></td><td class="n"><b>${f(t.Blue)}</b></td></tr>`, av = (a,b) => b ? (a/b).toFixed(1) : '–';
+      inner = `<div class="card"><h2>Green v Blue</h2><div class="tablewrap"><table><thead><tr><th></th><th class="n"><span class="teamtag Green">Green</span></th><th class="n"><span class="teamtag Blue">Blue</span></th></tr></thead><tbody>
+        ${row('Wins', o=>o.wins)}${row('Total runs', o=>o.runs)}${row('Average innings', o=>av(o.runs,o.inns))}${row('Average 1st innings', o=>av(o.first,o.firstN))}${row('Average last innings', o=>av(o.last,o.lastN))}</tbody></table></div></div>`; }
+    if (sub === 't_high') inner = tbl('Highest Team Innings', '', TI.slice().sort((a,b)=>b.runs-a.runs).slice(0,10));
+    if (sub === 't_low') inner = tbl('Lowest Team Innings', 'Completed innings only (not chases that finished early).', TI.filter(x=>!(x.last && H.results.find(r=>r.m===x.m)?.r.wkts != null && x.team === H.results.find(r=>r.m===x.m).r.winner)).sort((a,b)=>a.runs-b.runs).slice(0,10));
+    if (sub === 't_first') inner = tbl('Highest 1st Innings', '', TI.filter(x=>x.first).sort((a,b)=>b.runs-a.runs).slice(0,10));
+    if (sub === 't_target') { const rows = H.results.map(x => withMatch(x.m, () => { const ch = other(x.m.battingFirst), last = x.m.innings[x.m.innings.length-1];
+        const lastRuns = last && last.team === ch ? innFigures(last).runs : 0; return {m:x.m, team:x.m.battingFirst, target: teamTotal(x.m.battingFirst) - (teamTotal(ch) - lastRuns) + 1, won: x.r.winner === x.m.battingFirst}; })).sort((a,b)=>b.target-a.target);
+      inner = `<div class="card"><h2>Highest Targets Set</h2><p class="muted small">Runs the chasing side needed to win in the final innings.</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Set by</th><th class="n">Target</th><th>Result</th><th>Match</th></tr></thead><tbody>
+        ${rows.map((x,i)=>`<tr><td class="tnum muted">${i+1}</td><td><span class="teamtag ${x.team}">${x.team}</span></td><td class="n"><b>${x.target}</b></td><td class="small">${x.won?'Defended':'Chased down'}</td><td>${yearLink(x.m, String(x.m.year), 'openmatch')}</td></tr>`).join('')}</tbody></table></div></div>`; }
+    if (sub === 't_wins') { const rows = H.results.filter(x=>x.r.winner!=='Tie').sort((a,b)=>(b.r.wkts==null?b.r.margin:0)-(a.r.wkts==null?a.r.margin:0));
+      inner = `<div class="card"><h2>Biggest Wins</h2><div class="tablewrap"><table><thead><tr><th>#</th><th>Winner</th><th>Result</th><th>Match</th></tr></thead><tbody>
+        ${rows.map((x,i)=>`<tr><td class="tnum muted">${i+1}</td><td><span class="teamtag ${x.r.winner}">${x.r.winner}</span></td><td>${esc(resultText(x.r))}</td><td>${yearLink(x.m, String(x.m.year), 'openmatch')}</td></tr>`).join('')}</tbody></table></div></div>`; }
+    body = `<div class="tabs subtabs">${ST('t_sum','Green v Blue')}${ST('t_high','Highest Innings')}${ST('t_low','Lowest Innings')}${ST('t_first','Highest 1st Innings')}${ST('t_target','Highest Targets Set')}${ST('t_wins','Biggest Wins')}</div>${inner}`;
   }
   if (tab === 'heritage') {
     body = `<div class="card"><h2>Heritage Numbers</h2><p class="muted small">Every player in order of debut.</p><div class="tablewrap"><table><thead><tr><th>No.</th><th>Player</th><th class="n">Debut</th><th class="n">Matches</th></tr></thead><tbody>
@@ -716,7 +771,7 @@ function vHonours(){
       ${rows.map(([n,v],i)=>`<tr><td class="tnum muted">${i+1}</td><td>${esc(n)}</td><td class="n"><b>${Math.round(v)}</b></td><td class="n">${H.apps[n]||0}</td><td class="n">${H.apps[n]?Math.round(v/H.apps[n]):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   return `${topbar('Honour’s Board', `${done.length} matches`)}
-  <div class="tabs">${T('heritage','Heritage Number')}${T('ten','10-Gamers')}${T('pom','Player of the Match')}${T('bat','Batting Records')}${T('bowl','Bowling Records')}${T('points','Career Points')}</div>
+  <div class="tabs">${T('heritage','Heritage Number')}${T('ten','10-Gamers')}${T('pom','Player of the Match')}${T('bat','Batting Records')}${T('bowl','Bowling Records')}${T('team','Team Records')}${T('points','Career Points')}</div>
   ${body}
   ${tab === 'pom' || tab === 'points' ? `<div class="card"><h3>How Player of the Match is worked out</h3><p class="muted small">1 point per run, plus a bonus for a big share of the innings (smaller in short innings), 10 for a fifty and 15 more for a hundred. 20 per wicket, plus 2 for a top-three batter and 5 for one already on 30+. 4 per catch or stumping and 8 per run out, plus 2 if the batter had made 30+. A top-three batter making 30+ earns 5 extra (top-order bonuses count from 2024). Bonuses for a new personal best (once a player has two previous matches), a lone hand (30+ when no one else got near), a best-ever bowling haul, taking most of an innings’ wickets, and the top score in the innings that set up the win. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p></div>` : ''}`;
 }
