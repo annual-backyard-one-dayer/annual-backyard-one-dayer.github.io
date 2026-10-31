@@ -192,8 +192,9 @@ function impact(m, opts = {}){
         if (gain > 0 && (!best || gain > best.gain)) best = {inn: i, gain};
       });
       if (best) {
-        const bat = innFigures(best.inn).bat.slice().sort((x,y)=>y.runs-x.runs)[0];
-        if (bat && bat.runs >= 30) { add(bat.name, 15); note(bat.name, `Set up the win: top score of ${bat.runs} in the innings that swung the match (${r.winner} gained ${best.gain} runs)`); }
+        const bf = innFigures(best.inn), bat = bf.bat.slice().sort((x,y)=>y.runs-x.runs)[0];
+        const share = bat && bf.runs ? bat.runs / bf.runs : 0;
+        if (bat && bat.runs >= 30 && share >= 0.4) { add(bat.name, 15 * Math.min(1, share / 0.6)); note(bat.name, `Set up the win: ${bat.runs} of ${bf.runs} in the innings that swung the match (${r.winner} gained ${best.gain} runs)`); }
       }
     }
     const rank = Object.keys(pts).map(n => ({name:n, pts:pts[n], team:team[n], ...st[n]})).sort((a,b)=>b.pts-a.pts);
