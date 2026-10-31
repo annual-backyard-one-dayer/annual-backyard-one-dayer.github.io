@@ -183,6 +183,19 @@ function impact(m, opts = {}){
       });
       if (extras) { f.bat.forEach(b => cb.bestW[b.name] = Math.max(cb.bestW[b.name] ?? 0, 0)); Object.entries(wc).forEach(([n, c]) => cb.bestW[n] = Math.max(cb.bestW[n] ?? 0, c)); }
     });
+    if (extras && opts.setup !== false && r.winner !== 'Tie') {
+      // The winning side's decisive innings: the round where they gained most on the other team
+      let best = null;
+      M.innings.filter(i => i.team === r.winner).forEach(i => {
+        const opp = M.innings.find(j => j.team !== r.winner && j.no === i.no); if (!opp) return;
+        const gain = innFigures(i).runs - innFigures(opp).runs;
+        if (gain > 0 && (!best || gain > best.gain)) best = {inn: i, gain};
+      });
+      if (best) {
+        const bat = innFigures(best.inn).bat.slice().sort((x,y)=>y.runs-x.runs)[0];
+        if (bat && bat.runs >= 30) { add(bat.name, 15); note(bat.name, `Set up the win: top score of ${bat.runs} in the innings that swung the match (${r.winner} gained ${best.gain} runs)`); }
+      }
+    }
     const rank = Object.keys(pts).map(n => ({name:n, pts:pts[n], team:team[n], ...st[n]})).sort((a,b)=>b.pts-a.pts);
     if (!rank.length) return null;
     let pick = rank[0], reason = '';
