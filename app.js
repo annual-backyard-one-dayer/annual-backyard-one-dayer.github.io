@@ -159,11 +159,13 @@ function impact(m, opts = {}){
     const note = (n, t) => { st[n] = st[n] || {r:0,w:0,f:0,notes:[]}; st[n].notes.push(t); };
     ['Green','Blue'].forEach(t => M.teams[t].forEach(n => team[n] = t));
     let incomplete = false;
+    const orderOk = +M.year >= 2024; // batting orders before 2024 weren't reliably recorded
     M.innings.forEach(inn => {
       const f = innFigures(inn), w = inn.no === maxNo ? wLast : 1, wc = {};
       f.bat.forEach((b, i) => {
         team[b.name] = team[b.name] || inn.team;
         add(b.name, (b.runs + (b.runs >= 10 && f.runs ? 20*b.runs/f.runs*Math.min(1, f.runs/100) : 0) + (b.runs>=50?10:0) + (b.runs>=100?15:0)) * w, ['r', b.runs]);
+        if (orderOk && b.pos <= 3 && b.runs >= 30) { add(b.name, 5 * w); note(b.name, `Top-order ${b.runs} batting at ${b.pos}`); }
         if (extras && b.runs >= 20) {
           const nextBest = Math.max(0, ...f.bat.filter((_,j)=>j!==i).map(x=>x.runs));
           if (b.runs >= 30 && f.wkts >= 3 && b.runs >= 2.5 * nextBest) { add(b.name, 15 * w); note(b.name, `Lone hand: ${b.runs} when no one else passed ${nextBest}`); }
@@ -173,7 +175,7 @@ function impact(m, opts = {}){
         if (extras) cb.bestR[b.name] = Math.max(cb.bestR[b.name] ?? 0, b.runs);
         const o = b.out; if (!o) return;
         if (o.how === 'Unknown') { incomplete = true; return; }
-        if (o.bowler && o.how !== 'Run out') { add(o.bowler, (20 + (b.pos<=3 && !M.historic ? 5 : 0) + bigWkt(b.runs, opts.bigWkt)) * w, ['w',1]); team[o.bowler] = team[o.bowler] || other(inn.team); wc[o.bowler] = (wc[o.bowler]||0) + 1; }
+        if (o.bowler && o.how !== 'Run out') { add(o.bowler, (20 + (b.pos<=3 && orderOk ? 5 : 0) + bigWkt(b.runs, opts.bigWkt)) * w, ['w',1]); team[o.bowler] = team[o.bowler] || other(inn.team); wc[o.bowler] = (wc[o.bowler]||0) + 1; }
         if (o.fielder && NEEDS_FIELDER[o.how]) { add(o.fielder, ((o.how==='Run out'?8:4) + (b.runs>=30?2:0)) * w, ['f',1]); team[o.fielder] = team[o.fielder] || other(inn.team); }
       });
       if (extras) Object.entries(wc).forEach(([n, c]) => {
@@ -565,7 +567,7 @@ function vAwards(){
       ${imp.reason ? `<div class="notice warn small">${esc(imp.reason)}</div>` : ''}
       <div class="tablewrap"><table><thead><tr><th>Top three</th><th>Team</th><th>Contribution</th><th class="n">Points</th></tr></thead><tbody>
       ${imp.top.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${CAP(x.team,'cap-xs')}<span class="teamtag ${x.team}">${x.team}</span></span></td><td class="small">${esc(statLine(x))}${(x.notes||[]).map(t=>`<div class="muted" style="font-size:13px">★ ${esc(t)}</div>`).join('')}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="muted small">Points: 1 per run, plus a bonus for a big share of the innings (smaller in short innings), 10 for a fifty and 15 more for a hundred. 20 per wicket, plus 5 for a top-three batter (from 2026 on; old batting orders weren’t reliable) or one already on 30+. 4 per catch or stumping and 8 per run out, plus 2 if the batter had made 30+. Bonuses for a new personal best, a lone hand (30+ when no one else got near), a best-ever bowling haul, taking most of an innings’ wickets, and the top score in the innings that set up the win. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p>
+      <p class="muted small">Points: 1 per run, plus a bonus for a big share of the innings (smaller in short innings), 10 for a fifty and 15 more for a hundred. 20 per wicket, plus 5 for a top-three batter or one already on 30+. A top-three batter making 30+ earns 5 extra (both top-order bonuses count from 2024, when batting orders were recorded reliably). 4 per catch or stumping and 8 per run out, plus 2 if the batter had made 30+. Bonuses for a new personal best, a lone hand (30+ when no one else got near), a best-ever bowling haul, taking most of an innings’ wickets, and the top score in the innings that set up the win. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p>
       ${imp.incomplete ? '<p class="small notice warn">Some dismissals weren’t recorded for this match, so this pick is based on incomplete records.</p>' : ''}`
       : '<p class="muted">Available once the match is finished.</p>'}
   </div>
