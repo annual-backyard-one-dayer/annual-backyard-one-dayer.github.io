@@ -208,7 +208,7 @@ function impact(m, opts = {}){
         else if (close && bl.pts >= 1.15*bw.pts) { pick = bl; reason = 'From the losing side: a match-winning effort in a close game.'; }
       }
     }
-    return {pick, reason, top: opts.all ? rank.slice(0,6) : rank.slice(0,3), incomplete};
+    return {pick, reason, top: opts.all ? rank.slice(0,6) : rank.slice(0,3), ranked: rank, incomplete};
   });
 }
 function statLine(x){ const p = []; if (x.r) p.push(`${x.r} run${x.r===1?'':'s'}`); if (x.w) p.push(`${x.w} wicket${x.w===1?'':'s'}`); if (x.f) p.push(`${x.f} catch${x.f===1?'':'es'}/run out${x.f===1?'':'s'}`); return p.join(' · ') || '—'; }
