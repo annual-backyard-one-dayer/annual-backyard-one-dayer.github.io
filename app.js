@@ -130,6 +130,7 @@ function fmtDate(d){ if (/^\d{4}-\d{2}-\d{2}$/.test(d||'')) { try { return new D
 function withMatch(m, fn){ const keep = M; M = m; try { return fn(); } finally { M = keep; } }
 
 /* ---------------- Player of the Match: impact score ---------------- */
+function bigWkt(runs, mode){ if (mode === 'per10') return Math.floor(runs/10); if (mode === 'quarter') return runs >= 20 ? runs/4 : 0; return runs >= 30 ? 5 : 0; }
 function careerBefore(m){
   // Best score and best innings haul for each player in earlier real matches (practice matches never count)
   const bestR = {}, bestW = {};
@@ -172,7 +173,7 @@ function impact(m, opts = {}){
         if (extras) cb.bestR[b.name] = Math.max(cb.bestR[b.name] ?? 0, b.runs);
         const o = b.out; if (!o) return;
         if (o.how === 'Unknown') { incomplete = true; return; }
-        if (o.bowler && o.how !== 'Run out') { add(o.bowler, (20 + (b.pos<=3?5:0) + (b.runs>=30?5:0)) * w, ['w',1]); team[o.bowler] = team[o.bowler] || other(inn.team); wc[o.bowler] = (wc[o.bowler]||0) + 1; }
+        if (o.bowler && o.how !== 'Run out') { add(o.bowler, (20 + (b.pos<=3?5:0) + bigWkt(b.runs, opts.bigWkt)) * w, ['w',1]); team[o.bowler] = team[o.bowler] || other(inn.team); wc[o.bowler] = (wc[o.bowler]||0) + 1; }
         if (o.fielder && NEEDS_FIELDER[o.how]) { add(o.fielder, (o.how==='Caught'?8:10) * w, ['f',1]); team[o.fielder] = team[o.fielder] || other(inn.team); }
       });
       if (extras) Object.entries(wc).forEach(([n, c]) => {
