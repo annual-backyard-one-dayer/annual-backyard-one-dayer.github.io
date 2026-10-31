@@ -174,7 +174,7 @@ function impact(m, opts = {}){
         const o = b.out; if (!o) return;
         if (o.how === 'Unknown') { incomplete = true; return; }
         if (o.bowler && o.how !== 'Run out') { add(o.bowler, (20 + (b.pos<=3?5:0) + bigWkt(b.runs, opts.bigWkt)) * w, ['w',1]); team[o.bowler] = team[o.bowler] || other(inn.team); wc[o.bowler] = (wc[o.bowler]||0) + 1; }
-        if (o.fielder && NEEDS_FIELDER[o.how]) { add(o.fielder, ((o.how==='Run out'?8:4) + (b.runs>=30?5:0)) * w, ['f',1]); team[o.fielder] = team[o.fielder] || other(inn.team); }
+        if (o.fielder && NEEDS_FIELDER[o.how]) { add(o.fielder, ((o.how==='Run out'?8:4) + (b.runs>=30?2:0)) * w, ['f',1]); team[o.fielder] = team[o.fielder] || other(inn.team); }
       });
       if (extras) Object.entries(wc).forEach(([n, c]) => {
         if (c >= 3 && c > f.wkts / 2) { add(n, 15 * w); note(n, `Took ${c} of the ${f.wkts} wickets in an innings`); }
@@ -551,7 +551,7 @@ function vAwards(){
       ${imp.reason ? `<div class="notice warn small">${esc(imp.reason)}</div>` : ''}
       <div class="tablewrap"><table><thead><tr><th>Top three</th><th>Team</th><th>Contribution</th><th class="n">Points</th></tr></thead><tbody>
       ${imp.top.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${CAP(x.team,'cap-xs')}<span class="teamtag ${x.team}">${x.team}</span></span></td><td class="small">${esc(statLine(x))}${(x.notes||[]).map(t=>`<div class="muted" style="font-size:13px">★ ${esc(t)}</div>`).join('')}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
-      <p class="muted small">Points: 1 per run, a bonus for a big share of the innings, 10 for a fifty and 15 more for a hundred; 20 per wicket (plus 5 for a top-three batter or one already on 30+); 4 per catch or stumping and 8 per run out, plus 5 if the batter had made 30 or more. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p>
+      <p class="muted small">Points: 1 per run, a bonus for a big share of the innings, 10 for a fifty and 15 more for a hundred; 20 per wicket (plus 5 for a top-three batter or one already on 30+); 4 per catch or stumping and 8 per run out, plus 2 if the batter had made 30 or more. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p>
       ${imp.incomplete ? '<p class="small notice warn">Some dismissals weren’t recorded for this match, so this pick is based on incomplete records.</p>' : ''}`
       : '<p class="muted">Available once the match is finished.</p>'}
   </div>
