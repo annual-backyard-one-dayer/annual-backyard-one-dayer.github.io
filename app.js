@@ -639,7 +639,7 @@ function tallyTable(title, intro, obj, head, fmt){
 }
 function vHonours(){
   const {done, H} = honoursData();
-  const tab = UI.htab || 'pom';
+  const tab = UI.htab || 'heritage';
   const T = (k, label) => `<button class="${tab===k?'on':''}" data-act="htab" data-k="${k}">${label}</button>`;
   let body = '';
   if (tab === 'pom') {
@@ -669,7 +669,7 @@ function vHonours(){
       ${rows.map(([n,v],i)=>`<tr><td class="tnum muted">${i+1}</td><td>${esc(n)}</td><td class="n"><b>${Math.round(v)}</b></td><td class="n">${H.apps[n]||0}</td><td class="n">${H.apps[n]?Math.round(v/H.apps[n]):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   return `${topbar('Honour’s Board', `${done.length} matches`)}
-  <div class="tabs">${T('pom','Player of the Match')}${T('tons','Centuries')}${T('fifties','Fifties')}${T('three','3 Wicket Innings')}${T('six','6 Wicket Days')}${T('heritage','Heritage Number')}${T('ten','10-Gamers')}${T('points','Career Points')}</div>
+  <div class="tabs">${T('heritage','Heritage Number')}${T('ten','10-Gamers')}${T('pom','Player of the Match')}${T('tons','Centuries')}${T('fifties','Fifties')}${T('three','3 Wicket Innings')}${T('six','6 Wicket Days')}${T('points','Career Points')}</div>
   ${body}
   ${tab === 'pom' || tab === 'points' ? `<div class="card"><h3>How Player of the Match is worked out</h3><p class="muted small">1 point per run, plus a bonus for a big share of the innings (smaller in short innings), 10 for a fifty and 15 more for a hundred. 20 per wicket, plus 2 for a top-three batter and 5 for one already on 30+. 4 per catch or stumping and 8 per run out, plus 2 if the batter had made 30+. A top-three batter making 30+ earns 5 extra (top-order bonuses count from 2024). Bonuses for a new personal best (once a player has two previous matches), a lone hand (30+ when no one else got near), a best-ever bowling haul, taking most of an innings’ wickets, and the top score in the innings that set up the win. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p></div>` : ''}`;
 }
@@ -757,7 +757,7 @@ document.addEventListener('click', e => {
     case 'view': V = t.dataset.v; UI.tab = null; if (V === 'honours') UI.fromHon = null; if (V==='score' && M && M.innings.length && !curInn().complete && !D) D = newDraft(''); if (V==='awards') UI.qr = true; break;
     case 'tab': UI.tab = +t.dataset.k; break;
     case 'htab': UI.htab = t.dataset.k; break;
-    case 'openaward': case 'openmatch': { const ht = UI.htab; openMatch(t.dataset.id); UI.fromHon = ht || 'pom'; if (a === 'openaward') V = 'awards'; break; }
+    case 'openaward': case 'openmatch': { const ht = UI.htab; openMatch(t.dataset.id); UI.fromHon = ht || 'heritage'; if (a === 'openaward') V = 'awards'; break; }
     case 'backhon': { const ht = UI.fromHon; M = null; D = null; UI = {htab: ht}; V = 'honours'; break; }
     case 'export': exportXlsx(); return;
     case 'openvote': M.voting = 'open'; M.playersPlayer = null; save(); refreshListEntry(); UI.qr = true; break;
