@@ -173,7 +173,7 @@ function impact(m, opts = {}){
           const nextBest = Math.max(0, ...f.bat.filter((_,j)=>j!==i).map(x=>x.runs));
           if (b.runs >= 30 && f.wkts >= 3 && b.runs >= 2.5 * nextBest) { add(b.name, 15 * w); note(b.name, `Lone hand: ${b.runs} when no one else passed ${nextBest}`); }
           const prev = cb.bestR[b.name];
-          if (vetR.has(b.name) && b.runs > prev) { add(b.name, Math.min(40, 5 + 0.5*(b.runs-prev)) * w); note(b.name, `New personal best ${b.runs} (previous best ${prev})`); }
+          if (vetR.has(b.name) && prev >= 20 && b.runs > prev) { add(b.name, Math.min(40, 5 + 0.5*(b.runs-prev)) * w); note(b.name, `New personal best ${b.runs} (previous best ${prev})`); }
         }
         if (extras) cb.bestR[b.name] = Math.max(cb.bestR[b.name] ?? 0, b.runs);
         const o = b.out; if (!o) return;
