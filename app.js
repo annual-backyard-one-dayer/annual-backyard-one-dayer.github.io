@@ -130,7 +130,23 @@ function fmtDate(d){ if (/^\d{4}-\d{2}-\d{2}$/.test(d||'')) { try { return new D
 function withMatch(m, fn){ const keep = M; M = m; try { return fn(); } finally { M = keep; } }
 
 /* ---------------- Player of the Match: impact score ---------------- */
-function impact(m){
+function careerBefore(m){
+  // Best score and best innings haul for each player in earlier real matches (practice matches never count)
+  const bestR = {}, bestW = {};
+  matches.forEach(x => { const f = x.full;
+    if (!f || f.practice || f.status !== 'complete' || f.id === m.id) return;
+    if (!m.practice && !(+f.matchNo < +m.matchNo)) return;
+    withMatch(f, () => f.innings.forEach(inn => { const fi = innFigures(inn), wc = {};
+      fi.bat.forEach(b => { bestR[b.name] = Math.max(bestR[b.name] ?? 0, b.runs); const o = b.out; if (o && o.bowler && o.how !== 'Run out' && o.how !== 'Unknown') wc[o.bowler] = (wc[o.bowler]||0) + 1; });
+      Object.keys(fi.bat.reduce((a,b)=>(a[b.name]=1,a),{})).forEach(n => bestW[n] = Math.max(bestW[n] ?? 0, 0));
+      Object.entries(wc).forEach(([n,c]) => bestW[n] = Math.max(bestW[n] ?? 0, c)); }));
+  });
+  return {bestR, bestW};
+}
+function impact(m, opts = {}){
+  const extras = opts.extras !== false;
+  const cb = extras ? careerBefore(m) : {bestR:{}, bestW:{}};
+  const vetR = new Set(Object.keys(cb.bestR)), vetW = new Set(Object.keys(cb.bestW));
   return withMatch(m, () => {
     if (!M || M.status !== 'complete' || !M.innings.length) return null;
     const r = result();
@@ -138,19 +154,33 @@ function impact(m){
     const close = r.winner === 'Tie' || (r.wkts != null ? r.wkts <= 2 : r.margin <= 15);
     const wLast = close ? 1.5 : (r.wkts == null && r.margin <= 30 ? 1.25 : 1);
     const pts = {}, st = {}, team = {};
-    const add = (n, v, k) => { if (!n) return; pts[n] = (pts[n]||0) + v; st[n] = st[n] || {r:0,w:0,f:0}; if (k) st[n][k[0]] += k[1]; };
+    const add = (n, v, k) => { if (!n) return; pts[n] = (pts[n]||0) + v; st[n] = st[n] || {r:0,w:0,f:0,notes:[]}; if (k) st[n][k[0]] += k[1]; };
+    const note = (n, t) => { st[n] = st[n] || {r:0,w:0,f:0,notes:[]}; st[n].notes.push(t); };
     ['Green','Blue'].forEach(t => M.teams[t].forEach(n => team[n] = t));
     let incomplete = false;
     M.innings.forEach(inn => {
-      const f = innFigures(inn), w = inn.no === maxNo ? wLast : 1;
-      f.bat.forEach(b => {
+      const f = innFigures(inn), w = inn.no === maxNo ? wLast : 1, wc = {};
+      f.bat.forEach((b, i) => {
         team[b.name] = team[b.name] || inn.team;
         add(b.name, (b.runs + (b.runs >= 10 && f.runs ? 20*b.runs/f.runs : 0) + (b.runs>=50?10:0) + (b.runs>=100?15:0)) * w, ['r', b.runs]);
+        if (extras && b.runs >= 20) {
+          const nextBest = Math.max(0, ...f.bat.filter((_,j)=>j!==i).map(x=>x.runs));
+          if (b.runs >= 2.5 * nextBest) { add(b.name, 15 * w); note(b.name, `Lone hand: ${b.runs} when no one else passed ${nextBest}`); }
+          const prev = cb.bestR[b.name];
+          if (vetR.has(b.name) && b.runs > prev) { add(b.name, Math.min(30, 5 + 0.5*(b.runs-prev)) * w); note(b.name, `New personal best ${b.runs} (previous best ${prev})`); }
+        }
+        if (extras) cb.bestR[b.name] = Math.max(cb.bestR[b.name] ?? 0, b.runs);
         const o = b.out; if (!o) return;
         if (o.how === 'Unknown') { incomplete = true; return; }
-        if (o.bowler && o.how !== 'Run out') { add(o.bowler, (20 + (b.pos<=3?5:0) + (b.runs>=30?5:0)) * w, ['w',1]); team[o.bowler] = team[o.bowler] || other(inn.team); }
+        if (o.bowler && o.how !== 'Run out') { add(o.bowler, (20 + (b.pos<=3?5:0) + (b.runs>=30?5:0)) * w, ['w',1]); team[o.bowler] = team[o.bowler] || other(inn.team); wc[o.bowler] = (wc[o.bowler]||0) + 1; }
         if (o.fielder && NEEDS_FIELDER[o.how]) { add(o.fielder, (o.how==='Caught'?8:10) * w, ['f',1]); team[o.fielder] = team[o.fielder] || other(inn.team); }
       });
+      if (extras) Object.entries(wc).forEach(([n, c]) => {
+        if (c >= 3 && c > f.wkts / 2) { add(n, 15 * w); note(n, `Took ${c} of the ${f.wkts} wickets in an innings`); }
+        const prev = cb.bestW[n];
+        if (vetW.has(n) && c >= 3 && c > prev) { add(n, Math.min(25, 8 + 5*(c-prev)) * w); note(n, `Best-ever innings haul: ${c} wickets (previous best ${prev})`); }
+      });
+      if (extras) { f.bat.forEach(b => cb.bestW[b.name] = Math.max(cb.bestW[b.name] ?? 0, 0)); Object.entries(wc).forEach(([n, c]) => cb.bestW[n] = Math.max(cb.bestW[n] ?? 0, c)); }
     });
     const rank = Object.keys(pts).map(n => ({name:n, pts:pts[n], team:team[n], ...st[n]})).sort((a,b)=>b.pts-a.pts);
     if (!rank.length) return null;
@@ -519,7 +549,7 @@ function vAwards(){
     ${imp ? `<div class="bigmsg" style="padding:8px 0;text-align:left">${esc(imp.pick.name)}</div>
       ${imp.reason ? `<div class="notice warn small">${esc(imp.reason)}</div>` : ''}
       <div class="tablewrap"><table><thead><tr><th>Top three</th><th>Team</th><th>Contribution</th><th class="n">Points</th></tr></thead><tbody>
-      ${imp.top.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${CAP(x.team,'cap-xs')}<span class="teamtag ${x.team}">${x.team}</span></span></td><td class="small">${esc(statLine(x))}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
+      ${imp.top.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${CAP(x.team,'cap-xs')}<span class="teamtag ${x.team}">${x.team}</span></span></td><td class="small">${esc(statLine(x))}${(x.notes||[]).map(t=>`<div class="muted" style="font-size:13px">★ ${esc(t)}</div>`).join('')}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
       <p class="muted small">Points: 1 per run, a bonus for a big share of the innings, 10 for a fifty and 15 more for a hundred; 20 per wicket (plus 5 for a top-three batter or one already on 30+); 8 per catch, 10 per run out or stumping. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p>
       ${imp.incomplete ? '<p class="small notice warn">Some dismissals weren’t recorded for this match, so this pick is based on incomplete records.</p>' : ''}`
       : '<p class="muted">Available once the match is finished.</p>'}
