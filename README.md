@@ -7,4 +7,4 @@ Match-day scoring app for the annual Backyard One-Dayer (Green v Blue).
 - Player of the Match picked on the numbers, Players' Player voted on phones
 - Data stored in Firebase Realtime Database; only the scorer login can change scores
 
-Open it at https://brodiecroft.github.io/one-dayer/
+Open it at https://annual-backyard-one-dayer.github.io/
