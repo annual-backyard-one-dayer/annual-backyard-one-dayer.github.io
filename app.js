@@ -163,7 +163,7 @@ function impact(m, opts = {}){
       f.bat.forEach((b, i) => {
         team[b.name] = team[b.name] || inn.team;
         add(b.name, (b.runs + (b.runs >= 10 && f.runs ? 20*b.runs/f.runs : 0) + (b.runs>=50?10:0) + (b.runs>=100?15:0)) * w, ['r', b.runs]);
-        if (extras && b.runs >= 20) {
+        if (extras && b.runs >= 30) {
           const nextBest = Math.max(0, ...f.bat.filter((_,j)=>j!==i).map(x=>x.runs));
           if (b.runs >= 2.5 * nextBest) { add(b.name, 15 * w); note(b.name, `Lone hand: ${b.runs} when no one else passed ${nextBest}`); }
           const prev = cb.bestR[b.name];
@@ -193,7 +193,7 @@ function impact(m, opts = {}){
         else if (close && bl.pts >= 1.15*bw.pts) { pick = bl; reason = 'From the losing side: a match-winning effort in a close game.'; }
       }
     }
-    return {pick, reason, top: rank.slice(0,3), incomplete};
+    return {pick, reason, top: opts.all ? rank.slice(0,6) : rank.slice(0,3), incomplete};
   });
 }
 function statLine(x){ const p = []; if (x.r) p.push(`${x.r} run${x.r===1?'':'s'}`); if (x.w) p.push(`${x.w} wicket${x.w===1?'':'s'}`); if (x.f) p.push(`${x.f} catch${x.f===1?'':'es'}/run out${x.f===1?'':'s'}`); return p.join(' · ') || '—'; }
