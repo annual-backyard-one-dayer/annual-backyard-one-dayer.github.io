@@ -163,9 +163,9 @@ function impact(m, opts = {}){
       f.bat.forEach((b, i) => {
         team[b.name] = team[b.name] || inn.team;
         add(b.name, (b.runs + (b.runs >= 10 && f.runs ? 20*b.runs/f.runs : 0) + (b.runs>=50?10:0) + (b.runs>=100?15:0)) * w, ['r', b.runs]);
-        if (extras && b.runs >= 30) {
+        if (extras && b.runs >= 20) {
           const nextBest = Math.max(0, ...f.bat.filter((_,j)=>j!==i).map(x=>x.runs));
-          if (b.runs >= 2.5 * nextBest) { add(b.name, 15 * w); note(b.name, `Lone hand: ${b.runs} when no one else passed ${nextBest}`); }
+          if (b.runs >= 30 && b.runs >= 2.5 * nextBest) { add(b.name, 15 * w); note(b.name, `Lone hand: ${b.runs} when no one else passed ${nextBest}`); }
           const prev = cb.bestR[b.name];
           if (vetR.has(b.name) && b.runs > prev) { add(b.name, Math.min(30, 5 + 0.5*(b.runs-prev)) * w); note(b.name, `New personal best ${b.runs} (previous best ${prev})`); }
         }
