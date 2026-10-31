@@ -613,7 +613,7 @@ function vVote(){
 /* ---- honour's board ---- */
 function honoursData(){
   const done = matches.filter(m=>m.full && !m.full.practice && m.status==='complete').map(m=>m.full).sort((a,b)=>(+a.matchNo)-(+b.matchNo));
-  const H = {pom:{}, pts:{}, apps:{}, tons:{}, fifties:{}, thirties:{}, ducks:{}, three:{}, six:{}, games:{}, inns:{}, wk:{}, pairs:{}, scores:[], two:{}};
+  const H = {pom:{}, pts:{}, apps:{}, tons:{}, fifties:{}, thirties:{}, ducks:{}, three:{}, six:{}, games:{}, inns:{}, wk:{}, pairs:{}, scores:[], two:{}, defend:{}};
   const push = (o, n, v) => (o[n] = o[n] || []).push(v);
   H.teamInns = []; H.wkFirst = {}; H.wkLast = {}; H.bestDay = {}; H.results = [];
   done.forEach(m => withMatch(m, () => {
@@ -636,6 +636,10 @@ function honoursData(){
     });
     Object.entries(day).forEach(([n,w]) => { if (w >= 6) push(H.six, n, {m, v:w}); });
     Object.entries(day).forEach(([n,w]) => { if (!H.bestDay[n] || w > H.bestDay[n].v) H.bestDay[n] = {m, v:w}; });
+    { // the match's final innings: the side that batted first is defending a total
+      const fin = m.innings[m.innings.length-1], won = result().winner === m.battingFirst;
+      if (fin && fin.team !== m.battingFirst) innFigures(fin).bowl.forEach(b => { if (!b.wkts) return; const d = H.defend[b.name] = H.defend[b.name] || {w:0, wonW:0, list:[]}; d.w += b.wkts; if (won) d.wonW += b.wkts; d.list.push({m, v:b.wkts, won}); });
+    }
     H.results.push({m, r: result()});
   }));
   return {done, H};
@@ -711,6 +715,9 @@ function vHonours(){
       inner = `<div class="card"><h2>Most Total Wickets</h2><p class="muted small">${note}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Wickets</th><th class="n">3-wkt inns</th><th class="n">Best innings</th></tr></thead><tbody>
         ${rows.map(([n,w],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${w.w}</b></td><td class="n">${(H.three[n]||[]).length}</td><td class="n">${w.bestM?yearLink(w.bestM, `${w.best} wkts`, 'openmatch'):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
+    if (sub === 'w_defend') { const rows = Object.entries(H.defend).sort((a,b)=>b[1].w-a[1].w || b[1].wonW-a[1].wonW); const rk = rankCells(rows, r=>r[1].w);
+      inner = `<div class="card"><h2>Most Wickets Defending a Total</h2><p class="muted small">Wickets in the final innings of the match, bowling for the side that batted first while the other side chases. These are the bowlers who stand up when the match is on the line. ${note}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Wickets</th><th class="n">In wins</th><th>When</th></tr></thead><tbody>
+        ${rows.map(([n,d],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${d.w}</b></td><td class="n">${d.wonW}</td><td class="small">${d.list.map(x=>yearLink(x.m, `${x.m.year}: ${x.v}${x.won?' ✓':''}`, 'openmatch')).join(' ')}</td></tr>`).join('')}</tbody></table></div><p class="muted small">✓ = total successfully defended.</p></div>`; }
     if (sub === 'w_two') inner = tallyTable('2 Wicket Innings', 'Exactly two wickets in an innings. ' + note, H.two, 'Times', x => `${x.v} wkts`);
     if (sub === 'w_firstinn') inner = countTable('1st Innings Wickets', 'Wickets taken in each side’s first innings. ' + note, H.wkFirst, 'Wickets');
     if (sub === 'w_lastinn') inner = countTable('Last Innings Wickets', 'Wickets taken in the final innings, when the match is decided. ' + note, H.wkLast, 'Wickets');
@@ -729,7 +736,7 @@ function vHonours(){
         ${who ? `<div class="grid2">${tbl(`${esc(who)} has dismissed`, pairs.filter(x=>x.bw===who).sort((a,b)=>b.c-a.c), 'Batter', '', 'bt', '')}${tbl(`${esc(who)} has been dismissed by`, pairs.filter(x=>x.bt===who).sort((a,b)=>b.c-a.c), 'Bowler', '', 'bw', '')}</div>`
           : tbl('Most frequent match-ups', pairs.filter(x=>x.c>=2).sort((a,b)=>b.c-a.c), 'Bowler', 'Batter', 'bw', 'bt')}</div>`;
     }
-    body = `<div class="tabs subtabs">${ST('w_total','Most Total Wickets')}${ST('w_day','Most Wickets in a Day')}${ST('w_two','2 Wicket Innings')}${ST('w_three','3 Wicket Innings')}${ST('w_six','6 Wicket Days')}${ST('w_firstinn','1st Innings Wickets')}${ST('w_lastinn','Last Innings Wickets')}${ST('w_h2h','Dismissals')}</div>${inner}`;
+    body = `<div class="tabs subtabs">${ST('w_total','Most Total Wickets')}${ST('w_day','Most Wickets in a Day')}${ST('w_two','2 Wicket Innings')}${ST('w_three','3 Wicket Innings')}${ST('w_six','6 Wicket Days')}${ST('w_firstinn','1st Innings Wickets')}${ST('w_lastinn','Last Innings Wickets')}${ST('w_defend','Most Wickets Defending a Total')}${ST('w_h2h','Dismissals')}</div>${inner}`;
   }
   if (tab === 'team') {
     sub = UI.hsub && UI.hsub.startsWith('t_') ? UI.hsub : 't_sum';
