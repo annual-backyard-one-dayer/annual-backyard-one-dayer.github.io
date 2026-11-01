@@ -205,6 +205,11 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 .linkbtn:hover{border-color:var(--turf);color:var(--turf)}
 .subtabs button{font-size:14px;padding:6px 12px}
 .subtabs{padding-left:12px;border-left:3px solid var(--gold)}
+.picklist{display:flex;flex-direction:column;max-width:560px}
+.prow{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:12px;padding:7px 10px;border-bottom:1px solid var(--line);border-radius:8px}
+.prow:hover{background:var(--surface-2)}
+.prow.Green{background:var(--green-soft)} .prow.Blue{background:var(--blue-soft)}
+.prow .pname{font-weight:500;min-width:0}
 </style>
 </head>
 <body>
@@ -215,6 +220,6 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>

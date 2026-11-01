@@ -239,9 +239,11 @@ function paintStrip(){
 
 /* ---------------- views ---------------- */
 function render(){
+  const keep = {}; document.querySelectorAll('.listscroll[id]').forEach(el => keep[el.id] = el.scrollTop); const wy = window.scrollY;
   const f = {honours:vHonours, home:vHome, login:vLogin, setup:vSetup, openers:vOpeners, score:vScore, card:vCard, awards:vAwards, vote:vVote, admin:vAdmin}[V] || vHome;
   $app.innerHTML = f();
   paintStrip(); paintSave();
+  Object.entries(keep).forEach(([id, top]) => { const el = document.getElementById(id); if (el) el.scrollTop = top; }); if (Math.abs(window.scrollY - wy) > 2 && V === 'setup') window.scrollTo(0, wy);
   if (UI.focus) { const el = document.getElementById(UI.focus); if (el) el.focus(); UI.focus = null; }
   if (document.getElementById('qr')) drawQr();
 }
@@ -341,7 +343,7 @@ function vSetup(){
   const all = players.map(p=>p.name).concat(s.newp);
   const q = s.q.trim().toLowerCase();
   const shown = all.filter(n=>!q || n.toLowerCase().includes(q));
-  const box = t => { const l = teamList(t); return `<div class="teambox ${t}"><div class="row spread"><span class="row" style="gap:10px">${CAP(t,'cap-md')}<span class="teamtag ${t}" style="font-size:22px">${t}</span></span><span class="tnum">${l.length} players</span></div>
+  const box = t => { const l = teamList(t); return `<div class="teambox ${t}"><div class="row spread"><span class="row" style="gap:10px">${CAP(t,'cap-md')}<span class="teamtag ${t}" style="font-size:22px">${t}</span></span><span class="tnum">${l.length} player${l.length===1?"":"s"}</span></div>
      <div class="small">${l.length ? l.map(n=>esc(n)+(s.newp.includes(n)?' <span class="pill debut">Debut</span>':'')).join(', ') : '<span class="muted">No one picked yet</span>'}</div>
      <div class="row spread"><span class="small">Wickets to bowl ${t} out</span>
        <span class="stepper"><button aria-label="Fewer wickets" data-act="wk" data-t="${t}" data-d="-1">−</button><span class="v tnum">${wkFor(t)}</span><button aria-label="More wickets" data-act="wk" data-t="${t}" data-d="1">+</button></span></div>
@@ -355,8 +357,8 @@ function vSetup(){
   </div><p class="muted small">You can end the match early or add another round of innings on the day.</p></div>
   <div class="card"><div class="row spread"><h2>Who’s playing</h2><span class="muted small">Tap Green or Blue next to each player</span></div>
     <div class="row"><input type="text" id="s-q" placeholder="Search players" value="${esc(s.q)}" style="flex:1"></div>
-    <div class="listscroll"><div class="pick">${shown.map(n=>`<div class="nm"><span class="muted tnum small" style="min-width:28px">${s.newp.includes(n)?'New':'#'+(all.indexOf(n)+1)}</span><span>${esc(n)}</span>${s.newp.includes(n)?'<span class="pill debut">Debut '+esc(year)+'</span>':''}</div>
-      <div class="seg"><button class="Green ${s.pick[n]==='Green'?'on':''}" data-act="pick" data-n="${esc(n)}" data-t="Green">Green</button><button class="Blue ${s.pick[n]==='Blue'?'on':''}" data-act="pick" data-n="${esc(n)}" data-t="Blue">Blue</button></div>`).join('') || '<span class="muted">No players match that search.</span><span></span>'}</div></div>
+    <div class="listscroll" id="pick-list"><div class="picklist">${shown.map(n=>`<div class="prow ${s.pick[n]||''}"><span class="muted tnum small pnum">${s.newp.includes(n)?'New':'#'+(all.indexOf(n)+1)}</span><span class="pname">${esc(n)}${s.newp.includes(n)?' <span class="pill debut">Debut '+esc(year)+'</span>':''}</span>
+      <div class="seg"><button class="Green ${s.pick[n]==='Green'?'on':''}" data-act="pick" data-n="${esc(n)}" data-t="Green" aria-label="${esc(n)} plays for Green">Green</button><button class="Blue ${s.pick[n]==='Blue'?'on':''}" data-act="pick" data-n="${esc(n)}" data-t="Blue" aria-label="${esc(n)} plays for Blue">Blue</button></div></div>`).join('') || '<span class="muted">No players match that search.</span>'}</div></div>
     <div class="row"><input type="text" id="s-new" placeholder="New player, e.g. A. Smith" style="flex:1"><button data-act="addp">Add new player</button></div>
     <span class="muted small">New players are marked as debutants for ${esc(year)} and added to the player list.</span>
   </div>
