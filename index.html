@@ -210,6 +210,14 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 .prow:hover{background:var(--surface-2)}
 .prow.Green{background:var(--green-soft)} .prow.Blue{background:var(--blue-soft)}
 .prow .pname{font-weight:500;min-width:0}
+.namebtn{border:0;background:none;padding:0;font:inherit;color:inherit;font-weight:inherit;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;text-align:left}
+.namebtn:hover{color:var(--turf);text-decoration-color:var(--turf)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .lab{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-family:var(--display);font-weight:600}
+.tile .val{font-family:var(--display);font-size:32px;font-weight:700;line-height:1.05}
+.tile .sub{font-size:13px;color:var(--muted)}
+table.kv td{padding:6px 4px}
 </style>
 </head>
 <body>
@@ -220,6 +228,6 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=34"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>

@@ -43,9 +43,11 @@ function normalize(m){
 
 /* ---------------- persistence ---------------- */
 let saveChain = Promise.resolve();
-function persistLocal(){ if (!M) return; lsSet('match_'+M.id, M); lsSet('draft_'+M.id, D); }
+function persistLocal(){ if (!M) return; lsSet('match_'+M.id, M); lsSet('draft_'+M.id, D); const ids = new Set(lsGet('localIds')||[]); if (!ids.has(M.id)) { ids.add(M.id); lsSet('localIds', [...ids]); } }
+let online = true;
 function save(){
   if (!M) return;
+  M.updatedAt = Date.now();
   persistLocal();
   if (!db || !canWrite) return;
   const body = clone(M);
@@ -57,7 +59,8 @@ function savePlayers(){ if (db && canWrite) saveChain = saveChain.then(() => db.
 function paintSave(){
   const el = document.getElementById('savestate'); if (!el) return;
   if (!canWrite) { el.textContent = ''; return; }
-  el.textContent = {saving:'Saving…', saved:'Saved', error: UI.permErr ? 'Couldn’t save: database rules not set up' : 'Couldn’t save online — kept on this device'}[saveState] || '';
+  el.textContent = !online ? 'Offline: saved on this device, will sync when back online' : ({saving:'Saving…', saved:'Saved', error: UI.permErr ? 'Couldn’t save: database rules not set up' : 'Couldn’t save online — kept on this device'}[saveState] || '');
+  if (!online) { el.style.color = 'var(--warn)'; return; }
   el.style.color = saveState === 'error' ? 'var(--danger)' : 'var(--muted)';
 }
 
@@ -240,7 +243,7 @@ function paintStrip(){
 /* ---------------- views ---------------- */
 function render(){
   const keep = {}; document.querySelectorAll('.listscroll[id]').forEach(el => keep[el.id] = el.scrollTop); const wy = window.scrollY;
-  const f = {honours:vHonours, home:vHome, login:vLogin, setup:vSetup, openers:vOpeners, score:vScore, card:vCard, awards:vAwards, vote:vVote, admin:vAdmin}[V] || vHome;
+  const f = {player:vPlayer, honours:vHonours, home:vHome, login:vLogin, setup:vSetup, openers:vOpeners, score:vScore, card:vCard, awards:vAwards, vote:vVote, admin:vAdmin}[V] || vHome;
   $app.innerHTML = f();
   paintStrip(); paintSave();
   Object.entries(keep).forEach(([id, top]) => { const el = document.getElementById(id); if (el) el.scrollTop = top; }); if (Math.abs(window.scrollY - wy) > 2 && V === 'setup') window.scrollTo(0, wy);
@@ -265,6 +268,7 @@ function vHome(){
   const w = {Green:0, Blue:0, Tie:0}; done.forEach(m => { try { w[withMatch(m.full, result).winner]++; } catch(e) {} });
   const needsSetup = canWrite && (UI.readDenied || (loaded.players && loaded.matches && (!players.length || !done.length)));
   return `${topbar('One-Dayer Scorer')}
+  ${!online && db ? '<div class="notice warn">You’re offline. Everything still works: scores are saved on this device and sync when the connection comes back.</div>' : ''}
   ${open ? `<div class="notice good row spread"><span><b>Players’ Player voting is open</b> for ${open.full.practice?'the practice match':'Match '+esc(open.full.matchNo)}.</span><a class="btnlink primary" href="#vote">Vote now</a></div>` : ''}
   ${needsSetup ? `<div class="notice warn row spread"><span>Finish setting up: publish the database rules and load your past matches.</span><button class="primary" data-act="view" data-v="admin">Finish setup</button></div>` : ''}
   ${done.length ? `<div class="card" style="gap:6px"><div class="eyebrow">Overall · ${done.length} matches</div>
@@ -313,19 +317,24 @@ function vAdmin(){
     <textarea id="rulesbox" readonly style="width:100%;min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:13px">${esc(rulesText(me.uid))}</textarea>
     <div class="row"><button data-act="copyrules">Copy rules</button><span id="copymsg" class="small muted"></span></div></div>
   <div class="card"><h2>2. Past matches and players</h2>
-    <p class="muted small">Loads the 12 matches from 2014 to 2025 and the 27 players in heritage order. Safe to run again: it replaces the same records.</p>
+    <p class="muted small">Loads the 12 matches from 2014 to 2025 and the original 27 players. Safe to run again: it only refreshes those 12 matches, and never removes players added since or touches matches from 2026 on.</p>
     <p class="small">${done} past matches and ${players.length} players loaded.</p>
     ${UI.imp?`<div class="notice ${UI.imp.bad?'bad':'good'}">${esc(UI.imp.t)}</div>`:''}
-    <div class="row"><button class="primary" data-act="import">Load past matches and players</button></div></div>`;
+    <div class="row"><button class="primary" data-act="import">Load past matches and players</button></div></div>
+  <div class="card"><h2>3. Backup</h2><p class="muted small">Download every match as a spreadsheet: one row per batter per innings, plus bowling, results and players. Worth doing once a year after the match.</p>
+    <div class="row"><button class="primary" data-act="exportall">Download every match</button></div></div>`;
 }
 async function importHistory(){
   UI.imp = {t:'Loading…'}; render();
   try {
     const seed = await (await fetch('seed.json', {cache:'no-store'})).json();
-    const upd = {players: seed.players};
+    // merge, never remove: keep anyone added since (new debutants), in heritage order
+    const have = players.slice(), merged = seed.players.map(sp => have.find(p => p.name === sp.name) || sp);
+    have.forEach(p => { if (!merged.some(x => x.name === p.name)) merged.push(p); });
+    const upd = {players: merged};
     Object.values(seed.matches).forEach(m => upd['matches/'+m.id] = m);
     await db.ref().update(upd);
-    UI.imp = {t:`Done: ${Object.keys(seed.matches).length} matches and ${seed.players.length} players loaded.`};
+    UI.imp = {t:`Done: ${Object.keys(seed.matches).length} past matches loaded and ${merged.length} players on the list (anyone added since was kept).`};
     loaded.players = loaded.matches = false; subscribe();
   } catch(e) {
     UI.imp = {bad:1, t: /permission/i.test(String(e && e.message)) ? 'Firebase refused the save. Publish the database rules in step 1 first, then try again.' : 'Something went wrong loading the history. Check the internet connection and try again.'};
@@ -532,10 +541,10 @@ function cardHtml(inn){
   const f = innFigures(inn);
   return `<div class="card"><div class="row spread"><h2 class="row" style="gap:10px">${CAP(inn.team,'cap-sm')}<span><span class="teamtag ${inn.team}">${inn.team}</span> · ${ord(inn.no)} innings</span></h2><span class="tnum" style="font-family:var(--display);font-size:26px;font-weight:700">${f.wkts}/${f.runs}</span></div>
   <div class="tablewrap"><table><thead><tr><th>#</th><th>Batter</th><th></th><th class="n">R</th><th class="n">B</th><th class="n">SR</th></tr></thead><tbody>
-  ${f.bat.map(b=>`<tr><td class="tnum muted">${b.pos}</td><td>${esc(b.name)}</td><td class="howout">${esc(howText(b.out))}</td><td class="n"><b>${b.runs}</b></td><td class="n">${b.bk?b.balls:'–'}</td><td class="n">${b.bk&&b.balls?(b.runs/b.balls*100).toFixed(0):'–'}</td></tr>`).join('')}
+  ${f.bat.map(b=>`<tr><td class="tnum muted">${b.pos}</td><td>${pLink(b.name)}</td><td class="howout">${esc(howText(b.out))}</td><td class="n"><b>${b.runs}</b></td><td class="n">${b.bk?b.balls:'–'}</td><td class="n">${b.bk&&b.balls?(b.runs/b.balls*100).toFixed(0):'–'}</td></tr>`).join('')}
   <tr class="tot"><td></td><td>Total</td><td class="howout">${f.overs==null?'':f.overs+' overs'}</td><td class="n">${f.runs}</td><td></td><td></td></tr></tbody></table></div>
   ${f.bowl.length ? `<div class="tablewrap"><table><thead><tr><th>Bowler</th><th class="n">O</th><th class="n">M</th><th class="n">R</th><th class="n">W</th><th class="n">Econ</th></tr></thead><tbody>
-  ${f.bowl.map(b=>`<tr><td>${esc(b.name)}</td><td class="n">${b.overs??'–'}</td><td class="n">${b.maidens??'–'}</td><td class="n">${b.runs??'–'}</td><td class="n"><b>${b.wkts}</b></td><td class="n">${b.overs?(b.runs/b.overs).toFixed(1):'–'}</td></tr>`).join('')}</tbody></table></div>` : ''}
+  ${f.bowl.map(b=>`<tr><td>${pLink(b.name)}</td><td class="n">${b.overs??'–'}</td><td class="n">${b.maidens??'–'}</td><td class="n">${b.runs??'–'}</td><td class="n"><b>${b.wkts}</b></td><td class="n">${b.overs?(b.runs/b.overs).toFixed(1):'–'}</td></tr>`).join('')}</tbody></table></div>` : ''}
   ${inn.card ? '<p class="muted small">Scored before the app: runs and dismissals only. Balls faced and bowlers’ overs and runs weren’t recorded.</p>' : ''}</div>`;
 }
 function awardsBanner(){
@@ -554,6 +563,7 @@ function vCard(){
   return `${topbar(`Green ${r.g} · Blue ${r.b}`, `${M.practice?'':'Match '+(M.matchNo||'')+' · '}${fmtDate(M.date)} · ${live ? (canWrite?'Scorecard':'Live') : resultText(r)}`)}
   ${!canWrite && live ? '<div class="notice good small">Live: updates at the end of each over.</div>' : ''}
   ${UI.fromHon ? '<div class="row"><button class="primary" data-act="backhon">Back to Honour’s Board</button></div>' : ''}
+  ${UI.fromPlayer ? `<div class="row"><button class="primary" data-act="backplayer">Back to ${esc(UI.fromPlayer.UI.pname)}</button></div>` : ''}
   ${awardsBanner()}
   ${UI.msg ? `<div class="notice bad">${esc(UI.msg)}</div>` : ''}
   <div class="row">${canWrite && live ? `<button class="primary" data-act="view" data-v="score">Back to scoring</button>` : ''}
@@ -573,7 +583,7 @@ function vAwards(){
     ${imp ? `<div class="bigmsg" style="padding:8px 0;text-align:left">${esc(imp.pick.name)}</div>
       ${imp.reason ? `<div class="notice warn small">${esc(imp.reason)}</div>` : ''}
       <div class="tablewrap"><table><thead><tr><th>Top three</th><th>Team</th><th>Contribution</th><th class="n">Points</th></tr></thead><tbody>
-      ${imp.top.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${CAP(x.team,'cap-xs')}<span class="teamtag ${x.team}">${x.team}</span></span></td><td class="small">${esc(statLine(x))}${(x.notes||[]).map(t=>`<div class="muted" style="font-size:13px">★ ${esc(t)}</div>`).join('')}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
+      ${imp.top.map(x=>`<tr><td><b>${pLink(x.name)}</b></td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${CAP(x.team,'cap-xs')}<span class="teamtag ${x.team}">${x.team}</span></span></td><td class="small">${esc(statLine(x))}${(x.notes||[]).map(t=>`<div class="muted" style="font-size:13px">★ ${esc(t)}</div>`).join('')}</td><td class="n">${Math.round(x.pts)}</td></tr>`).join('')}</tbody></table></div>
       <p class="muted small">Points: 1 per run, plus a bonus for a big share of the innings (smaller in short innings), 10 for a fifty and 15 more for a hundred. 20 per wicket, plus 2 for a top-three batter and 5 for one already on 30+. A top-three batter making 30+ earns 5 extra (both top-order bonuses count from 2024, when batting orders were recorded reliably). 4 per catch or stumping and 8 per run out, plus 2 if the batter had made 30+. Bonuses for a new personal best (once a player has two previous matches), a lone hand (30+ when no one else got near), a best-ever bowling haul, taking most of an innings’ wickets, and the top score in the innings that set up the win. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p>
       ${imp.incomplete ? '<p class="small notice warn">Some dismissals weren’t recorded for this match, so this pick is based on incomplete records.</p>' : ''}`
       : '<p class="muted">Available once the match is finished.</p>'}
@@ -653,7 +663,7 @@ function tallyTable(title, intro, obj, head, fmt){
   const rk = rankCells(rows, r=>r[1].length);
   return `<div class="card"><h2>${title}</h2>${intro?`<p class="muted small">${intro}</p>`:''}
     ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">${head}</th><th>When</th></tr></thead><tbody>
-    ${rows.map(([n,l],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td><b>${esc(n)}</b></td><td class="n"><b>${l.length}</b></td><td class="small">${l.map(x=>yearLink(x.m, `${x.m.year}: ${fmt(x)}`, 'openmatch', x.team && x.inn ? x.team+'|'+x.inn : '')).join(' ')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None yet.</p>'}</div>`;
+    ${rows.map(([n,l],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td><b>${pLink(n)}</b></td><td class="n"><b>${l.length}</b></td><td class="small">${l.map(x=>yearLink(x.m, `${x.m.year}: ${fmt(x)}`, 'openmatch', x.team && x.inn ? x.team+'|'+x.inn : '')).join(' ')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None yet.</p>'}</div>`;
 }
 function avgRows(H, filt, minInns){
   return Object.entries(H.inns).map(([n,l]) => { const k = l.filter(filt); const runs = k.reduce((a,x)=>a+x.v,0), no = k.filter(x=>x.no).length, outs = k.length - no;
@@ -662,12 +672,12 @@ function avgRows(H, filt, minInns){
 }
 function avgTable(title, intro, rows){
   return `<div class="card"><h2>${title}</h2><p class="muted small">${intro}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Average</th><th class="n">Runs</th><th class="n">Inns</th><th class="n">NO</th><th class="n">Best</th></tr></thead><tbody>
-    ${rows.map((r,i)=>`<tr><td class="tnum muted">${i+1}</td><td>${esc(r.n)}</td><td class="n"><b>${r.avg.toFixed(2)}</b></td><td class="n">${r.runs}</td><td class="n">${r.inns}</td><td class="n">${r.no}</td><td class="n">${r.hs?yearLink(r.hs.m, `${r.hs.v}${r.hs.no?'*':''}`, 'openmatch', r.hs.team+'|'+r.hs.inn):'–'}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No one qualifies yet.</td></tr>'}</tbody></table></div></div>`;
+    ${rows.map((r,i)=>`<tr><td class="tnum muted">${i+1}</td><td>${pLink(r.n)}</td><td class="n"><b>${r.avg.toFixed(2)}</b></td><td class="n">${r.runs}</td><td class="n">${r.inns}</td><td class="n">${r.no}</td><td class="n">${r.hs?yearLink(r.hs.m, `${r.hs.v}${r.hs.no?'*':''}`, 'openmatch', r.hs.team+'|'+r.hs.inn):'–'}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">No one qualifies yet.</td></tr>'}</tbody></table></div></div>`;
 }
 function countTable(title, intro, obj, head){
   const rows = Object.entries(obj).filter(([n,v])=>v>0).sort((a,b)=>b[1]-a[1]); const rk = rankCells(rows, r=>r[1]);
   return `<div class="card"><h2>${title}</h2>${intro?`<p class="muted small">${intro}</p>`:''}<div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">${head}</th></tr></thead><tbody>
-    ${rows.map(([n,v],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${v}</b></td></tr>`).join('')}</tbody></table></div></div>`;
+    ${rows.map(([n,v],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${pLink(n)}</td><td class="n"><b>${v}</b></td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function vHonours(){
   const {done, H} = honoursData();
@@ -678,7 +688,7 @@ function vHonours(){
     const rows = Object.entries(H.pom).sort((a,b)=>b[1].length-a[1].length || (+a[1][0].matchNo)-(+b[1][0].matchNo)); const rk = rankCells(rows, r=>r[1].length);
     body = `<div class="card"><h2>Player of the Match</h2><p class="muted small">Tap a year to see that match’s top three and how the points were worked out.</p>
       <div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Awards</th><th>Years</th></tr></thead><tbody>
-      ${rows.map(([n,l],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td><b>${esc(n)}</b></td><td class="n"><b>${l.length}</b></td><td>${l.map(m=>yearLink(m, String(m.year))).join(' ')}</td></tr>`).join('')}</tbody></table></div></div>`;
+      ${rows.map(([n,l],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td><b>${pLink(n)}</b></td><td class="n"><b>${l.length}</b></td><td>${l.map(m=>yearLink(m, String(m.year))).join(' ')}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   const ST = (k, label) => `<button class="${sub===k?'on':''}" data-act="hsub" data-k="${k}">${label}</button>`;
   let sub = '';
@@ -689,12 +699,12 @@ function vHonours(){
       const rows = Object.entries(H.inns).map(([n,l]) => { const runs = l.reduce((a,x)=>a+x.v,0), no = l.filter(x=>x.no).length, outs = l.length - no, hs = l.reduce((a,x)=>x.v>a.v||(x.v===a.v&&x.no)?x:a, l[0]);
         return {n, runs, inns:l.length, no, avg: outs ? (runs/outs).toFixed(2) : '–', hs}; }).sort((a,b)=>b.runs-a.runs);
       inner = `<div class="card"><h2>Most Total Runs</h2><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Runs</th><th class="n">Inns</th><th class="n">NO</th><th class="n">Avg</th><th class="n">Best</th></tr></thead><tbody>
-        ${rows.map((r,i)=>`<tr><td class="tnum muted">${i+1}</td><td>${esc(r.n)}</td><td class="n"><b>${r.runs}</b></td><td class="n">${r.inns}</td><td class="n">${r.no}</td><td class="n">${r.avg}</td><td class="n">${yearLink(r.hs.m, `${r.hs.v}${r.hs.no?'*':''}`, 'openmatch', r.hs.team+'|'+r.hs.inn)}</td></tr>`).join('')}</tbody></table></div></div>`;
+        ${rows.map((r,i)=>`<tr><td class="tnum muted">${i+1}</td><td>${pLink(r.n)}</td><td class="n"><b>${r.runs}</b></td><td class="n">${r.inns}</td><td class="n">${r.no}</td><td class="n">${r.avg}</td><td class="n">${yearLink(r.hs.m, `${r.hs.v}${r.hs.no?'*':''}`, 'openmatch', r.hs.team+'|'+r.hs.inn)}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
     if (sub === 'b_high') {
       const rows = H.scores.slice().sort((a,b)=>b.v-a.v || (b.no?1:0)-(a.no?1:0)).slice(0, 25); const rk = rankCells(rows, r=>r.v+(r.no?'*':''));
       inner = `<div class="card"><h2>Highest Scores</h2><p class="muted small">The top 25 individual innings. * = not out.</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Score</th><th>Team</th><th>Match</th></tr></thead><tbody>
-        ${rows.map((r,i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(r.name)}</td><td class="n"><b>${r.v}${r.no?'*':''}</b></td><td><span class="teamtag ${r.team}">${r.team}</span></td><td>${yearLink(r.m, `${r.m.year} · ${ord(r.inn)} inns`, 'openmatch', r.team+'|'+r.inn)}</td></tr>`).join('')}</tbody></table></div></div>`;
+        ${rows.map((r,i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${pLink(r.name)}</td><td class="n"><b>${r.v}${r.no?'*':''}</b></td><td><span class="teamtag ${r.team}">${r.team}</span></td><td>${yearLink(r.m, `${r.m.year} · ${ord(r.inn)} inns`, 'openmatch', r.team+'|'+r.inn)}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
     if (sub === 'b_avg') inner = avgTable('Batting Average', 'Runs divided by times out. Minimum 5 innings.', avgRows(H, x=>true, 5));
     if (sub === 'b_no') { const o = {}; Object.entries(H.inns).forEach(([n,l]) => o[n] = l.filter(x=>x.no).length); inner = countTable('Most Not Outs', 'Innings finished not out.', o, 'Not outs'); }
@@ -715,24 +725,24 @@ function vHonours(){
     if (sub === 'w_total') {
       const rows = Object.entries(H.wk).filter(([n,w])=>w.w>0).sort((a,b)=>b[1].w-a[1].w || b[1].best-a[1].best); const rk = rankCells(rows, r=>r[1].w);
       inner = `<div class="card"><h2>Most Total Wickets</h2><p class="muted small">${note}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Wickets</th><th class="n">3-wkt inns</th><th class="n">Best innings</th></tr></thead><tbody>
-        ${rows.map(([n,w],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${w.w}</b></td><td class="n">${(H.three[n]||[]).length}</td><td class="n">${w.bestM?yearLink(w.bestM, `${w.best} wkts`, 'openmatch', w.bestInn):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
+        ${rows.map(([n,w],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${pLink(n)}</td><td class="n"><b>${w.w}</b></td><td class="n">${(H.three[n]||[]).length}</td><td class="n">${w.bestM?yearLink(w.bestM, `${w.best} wkts`, 'openmatch', w.bestInn):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
     }
     if (sub === 'w_defend') { const rows = Object.entries(H.defend).sort((a,b)=>b[1].w-a[1].w || b[1].wonW-a[1].wonW); const rk = rankCells(rows, r=>r[1].w);
       inner = `<div class="card"><h2>Most Wickets Defending a Total</h2><p class="muted small">Wickets in the final innings of the match, bowling for the side that batted first while the other side chases. These are the bowlers who stand up when the match is on the line. ${note}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Wickets</th><th class="n">In wins</th><th>When</th></tr></thead><tbody>
-        ${rows.map(([n,d],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${d.w}</b></td><td class="n">${d.wonW}</td><td class="small">${d.list.map(x=>yearLink(x.m, `${x.m.year}: ${x.v}${x.won?' ✓':''}`, 'openmatch', x.inn)).join(' ')}</td></tr>`).join('')}</tbody></table></div><p class="muted small">✓ = total successfully defended.</p></div>`; }
+        ${rows.map(([n,d],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${pLink(n)}</td><td class="n"><b>${d.w}</b></td><td class="n">${d.wonW}</td><td class="small">${d.list.map(x=>yearLink(x.m, `${x.m.year}: ${x.v}${x.won?' ✓':''}`, 'openmatch', x.inn)).join(' ')}</td></tr>`).join('')}</tbody></table></div><p class="muted small">✓ = total successfully defended.</p></div>`; }
     if (sub === 'w_two') inner = tallyTable('2 Wicket Innings', 'Exactly two wickets in an innings. ' + note, H.two, 'Times', x => `${x.v} wkts`);
     if (sub === 'w_firstinn') inner = countTable('1st Innings Wickets', 'Wickets taken in each side’s first innings. ' + note, H.wkFirst, 'Wickets');
     if (sub === 'w_lastinn') inner = countTable('Last Innings Wickets', 'Wickets taken in the final innings, when the match is decided. ' + note, H.wkLast, 'Wickets');
     if (sub === 'w_day') { const rows = Object.entries(H.bestDay).filter(([n,x])=>x.v>0).sort((a,b)=>b[1].v-a[1].v); const rk = rankCells(rows, r=>r[1].v);
       inner = `<div class="card"><h2>Most Wickets in a Day</h2><p class="muted small">Each player’s best match haul. ${note}</p><div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Wickets</th><th class="n">Match</th></tr></thead><tbody>
-        ${rows.map(([n,x],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${esc(n)}</td><td class="n"><b>${x.v}</b></td><td class="n">${yearLink(x.m, String(x.m.year), 'openmatch')}</td></tr>`).join('')}</tbody></table></div></div>`; }
+        ${rows.map(([n,x],i)=>`<tr><td class="tnum muted">${rk[i]}</td><td>${pLink(n)}</td><td class="n"><b>${x.v}</b></td><td class="n">${yearLink(x.m, String(x.m.year), 'openmatch')}</td></tr>`).join('')}</tbody></table></div></div>`; }
     if (sub === 'w_three') inner = tallyTable('3 Wicket Innings', 'Three or more wickets in a single innings. ' + note, H.three, 'Times', x => `${x.v} wkts`);
     if (sub === 'w_six') inner = tallyTable('6 Wicket Days', 'Six or more wickets across a whole match. ' + note, H.six, 'Times', x => `${x.v} wkts`);
     if (sub === 'w_h2h') {
       const pairs = Object.entries(H.pairs).map(([k,c]) => { const [bw, bt] = k.split('|'); return {bw, bt, c}; });
       const who = UI.dplayer || '';
       const names = [...new Set(pairs.flatMap(x=>[x.bw,x.bt]))].sort((a,b)=>players.findIndex(p=>p.name===a)-players.findIndex(p=>p.name===b));
-      const tbl = (title, list, colA, colB, keyA, keyB) => `<div style="min-width:0"><h3>${title}</h3>${list.length ? `<div class="tablewrap"><table><thead><tr><th>${colA}</th>${colB?`<th>${colB}</th>`:''}<th class="n">Times</th></tr></thead><tbody>${list.map(x=>`<tr><td>${esc(x[keyA])}</td>${colB?`<td>${esc(x[keyB])}</td>`:''}<td class="n"><b>${x.c}</b></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted small">None recorded.</p>'}</div>`;
+      const tbl = (title, list, colA, colB, keyA, keyB) => `<div style="min-width:0"><h3>${title}</h3>${list.length ? `<div class="tablewrap"><table><thead><tr><th>${colA}</th>${colB?`<th>${colB}</th>`:''}<th class="n">Times</th></tr></thead><tbody>${list.map(x=>`<tr><td>${pLink(x[keyA])}</td>${colB?`<td>${pLink(x[keyB])}</td>`:''}<td class="n"><b>${x.c}</b></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted small">None recorded.</p>'}</div>`;
       inner = `<div class="card"><h2>Dismissals</h2><p class="muted small">Who has got who out, by bowler (catches, bowled, lbw, stumpings; run outs aren’t credited to bowlers). ${note}</p>
         <label class="field" style="max-width:320px">Choose a player<select id="d-player"><option value="">Top match-ups (everyone)</option>${names.map(n=>`<option ${n===who?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
         ${who ? `<div class="grid2">${tbl(`${esc(who)} has dismissed`, pairs.filter(x=>x.bw===who).sort((a,b)=>b.c-a.c), 'Batter', '', 'bt', '')}${tbl(`${esc(who)} has been dismissed by`, pairs.filter(x=>x.bt===who).sort((a,b)=>b.c-a.c), 'Bowler', '', 'bw', '')}</div>`
@@ -765,27 +775,111 @@ function vHonours(){
   }
   if (tab === 'heritage') {
     body = `<div class="card"><h2>Heritage Numbers</h2><p class="muted small">Every player in order of debut.</p><div class="tablewrap"><table><thead><tr><th>No.</th><th>Player</th><th class="n">Debut</th><th class="n">Matches</th></tr></thead><tbody>
-      ${players.map((p,i)=>`<tr><td class="tnum muted">${i+1}</td><td>${esc(p.name)}</td><td class="n">${esc(p.debut||'')}</td><td class="n">${H.apps[p.name]||0}</td></tr>`).join('')}</tbody></table></div></div>`;
+      ${players.map((p,i)=>`<tr><td class="tnum muted">${i+1}</td><td>${pLink(p.name)}</td><td class="n">${esc(p.debut||'')}</td><td class="n">${H.apps[p.name]||0}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   if (tab === 'ten') {
     const rows = Object.entries(H.games).filter(([n,l])=>l.length>=10).map(([n,l])=>[n,l.length,l[9]]).sort((a,b)=>(+a[2].matchNo)-(+b[2].matchNo) || b[1]-a[1]);
     body = `<div class="card"><h2>10-Gamers</h2><p class="muted small">Players who’ve played 10 or more matches, in the order they reached 10.</p>
       ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Player</th><th class="n">Matches</th><th class="n">10th match</th></tr></thead><tbody>
-      ${rows.map(([n,c,m])=>`<tr><td><b>${esc(n)}</b></td><td class="n">${c}</td><td class="n">${yearLink(m, String(m.year), 'openmatch')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">No one yet.</p>'}</div>`;
+      ${rows.map(([n,c,m])=>`<tr><td><b>${pLink(n)}</b></td><td class="n">${c}</td><td class="n">${yearLink(m, String(m.year), 'openmatch')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">No one yet.</p>'}</div>`;
   }
   if (tab === 'points') {
     const rows = Object.entries(H.pts).sort((a,b)=>b[1]-a[1]);
     body = `<div class="card"><h2>Career Points</h2><p class="muted small">Each player’s Player of the Match points added up across every match. “Per match” levels things out for players with fewer games.</p>
       <div class="tablewrap"><table><thead><tr><th>#</th><th>Player</th><th class="n">Points</th><th class="n">Matches</th><th class="n">Per match</th></tr></thead><tbody>
-      ${rows.map(([n,v],i)=>`<tr><td class="tnum muted">${i+1}</td><td>${esc(n)}</td><td class="n"><b>${Math.round(v)}</b></td><td class="n">${H.apps[n]||0}</td><td class="n">${H.apps[n]?Math.round(v/H.apps[n]):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
+      ${rows.map(([n,v],i)=>`<tr><td class="tnum muted">${i+1}</td><td>${pLink(n)}</td><td class="n"><b>${Math.round(v)}</b></td><td class="n">${H.apps[n]||0}</td><td class="n">${H.apps[n]?Math.round(v/H.apps[n]):'–'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }
   return `${topbar('Honour’s Board', `${done.length} matches`)}
+  <div class="row"><button data-act="exportall">Download every match (spreadsheet)</button><span class="muted small">A full backup of every scorecard, in one spreadsheet.</span></div>
   <div class="tabs">${T('heritage','Heritage Number')}${T('ten','10-Gamers')}${T('pom','Player of the Match')}${T('bat','Batting Records')}${T('bowl','Bowling Records')}${T('team','Team Records')}${T('points','Career Points')}</div>
   ${body}
   ${tab === 'pom' || tab === 'points' ? `<div class="card"><h3>How Player of the Match is worked out</h3><p class="muted small">1 point per run, plus a bonus for a big share of the innings (smaller in short innings), 10 for a fifty and 15 more for a hundred. 20 per wicket, plus 2 for a top-three batter and 5 for one already on 30+. 4 per catch or stumping and 8 per run out, plus 2 if the batter had made 30+. A top-three batter making 30+ earns 5 extra (top-order bonuses count from 2024). Bonuses for a new personal best (once a player has two previous matches), a lone hand (30+ when no one else got near), a best-ever bowling haul, taking most of an innings’ wickets, and the top score in the innings that set up the win. Final-innings efforts count up to 1.5 times in a close match. A losing player only wins if they’re 50% clear of everyone on the winning side, or 15% clear in a close match.</p></div>` : ''}`;
 }
 
+
+/* ---- player pages ---- */
+const pLink = n => `<button class="namebtn" data-act="player" data-n="${esc(n)}">${esc(n)}</button>`;
+function vPlayer(){
+  const name = UI.pname, {done, H} = honoursData();
+  const hi = players.findIndex(p => p.name === name), pinfo = players[hi] || {};
+  const rows = [], bat = [], fld = {c:0, ro:0, st:0}; let wk = 0, best = null, bestDay = null, defend = 0, threes = 0;
+  const team = {Green:0, Blue:0};
+  done.forEach(m => { const t = m.teams.Green.includes(name) ? 'Green' : m.teams.Blue.includes(name) ? 'Blue' : null; if (!t) return;
+    withMatch(m, () => { team[t]++;
+      const r = result(), imp = impact(m), mine = imp && (imp.ranked||[]).find(x => x.name === name);
+      const maxNo = Math.max(...m.innings.map(i=>i.no)), fin = m.innings[m.innings.length-1];
+      let scores = [], mw = 0, mc = 0;
+      m.innings.forEach(inn => { const f = innFigures(inn), last = inn.no === maxNo;
+        f.bat.forEach(b => { if (b.name === name) { scores.push(`${b.runs}${b.out?'':'*'}`); bat.push({m, v:b.runs, no:!b.out, first: inn.no===1, setting: last && inn.team===m.battingFirst, chasing: last && inn.team!==m.battingFirst, key: inn.team+'|'+inn.no}); }
+          const o = b.out; if (!o) return;
+          if (o.fielder === name && o.how === 'Caught') { fld.c++; mc++; }
+          if (o.bowler === name && o.how === 'Caught & bowled') { fld.c++; mc++; }
+          if (o.fielder === name && o.how === 'Run out') { fld.ro++; mc++; }
+          if (o.fielder === name && o.how === 'Stumped') { fld.st++; mc++; } });
+        const b = f.bowl.find(x => x.name === name);
+        if (b && b.wkts) { wk += b.wkts; mw += b.wkts; if (b.wkts >= 3) threes++; if (!best || b.wkts > best.v) best = {m, v:b.wkts, key: inn.team+'|'+inn.no}; if (inn === fin && fin.team !== m.battingFirst) defend += b.wkts; }
+      });
+      if (mw && (!bestDay || mw > bestDay.v)) bestDay = {m, v:mw};
+      rows.push({m, t, scores, mw, mc, pts: mine ? mine.pts : 0, won: r.winner === t, tie: r.winner === 'Tie', pom: imp && imp.pick.name === name, pp: m.playersPlayer === name});
+    }); });
+  const agg = l => { const runs = l.reduce((a,x)=>a+x.v,0), no = l.filter(x=>x.no).length, outs = l.length - no; return {runs, inns:l.length, no, avg: outs ? (runs/outs).toFixed(2) : '–'}; };
+  const all = agg(bat), hs = bat.length ? bat.reduce((a,x)=>x.v>a.v||(x.v===a.v&&x.no)?x:a, bat[0]) : null;
+  const pts = H.pts[name] || 0, rankP = Object.entries(H.pts).sort((a,b)=>b[1]-a[1]).findIndex(x=>x[0]===name) + 1;
+  const vs = Object.entries(H.pairs).map(([k,c]) => { const [bw, bt] = k.split('|'); return {bw, bt, c}; });
+  const got = vs.filter(x=>x.bw===name).sort((a,b)=>b.c-a.c).slice(0,5), gotBy = vs.filter(x=>x.bt===name).sort((a,b)=>b.c-a.c).slice(0,5);
+  const tile = (lab, val, sub) => `<div class="tile"><span class="lab">${lab}</span><span class="val tnum">${val}</span>${sub?`<span class="sub">${sub}</span>`:''}</div>`;
+  const kv = list => `<table class="kv"><tbody>${list.map(([k,v])=>`<tr><td>${k}</td><td class="n"><b>${v}</b></td></tr>`).join('')}</tbody></table>`;
+  const a = l => agg(l).avg;
+  const back = UI.prev ? `<button class="ghost" data-act="pback">Back</button>` : '';
+  if (!rows.length && hi < 0) return `${topbar(name)}<div class="card"><p class="muted">No matches found for ${esc(name)}.</p>${back}</div>`;
+  return `${topbar(name, hi >= 0 ? `Heritage No. ${hi+1} · Debut ${pinfo.debut||'–'}` : 'Player')}
+  <div class="row">${back}${rows.filter(x=>x.pom).map(x=>`<span class="pill g">★ Player of the Match ${x.m.year}</span>`).join('')}${rows.filter(x=>x.pp).map(x=>`<span class="pill b">Players’ Player ${x.m.year}</span>`).join('')}</div>
+  <div class="tiles">
+    ${tile('Matches', rows.length, `${team.Green} Green · ${team.Blue} Blue`)}
+    ${tile('Runs', all.runs, `${all.inns} innings`)}
+    ${tile('Average', all.avg, `${all.no} not out`)}
+    ${tile('Best score', hs ? `${hs.v}${hs.no?'*':''}` : '–', hs ? String(hs.m.year) : '')}
+    ${tile('Wickets', wk, best ? `best ${best.v} in an innings` : '')}
+    ${tile('Catches', fld.c, fld.ro || fld.st ? `${fld.ro} run out${fld.ro===1?'':'s'} · ${fld.st} stumping${fld.st===1?'':'s'}` : '')}
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Batting</h3>${kv([['Innings', all.inns], ['Not outs', all.no], ['Runs', all.runs], ['Average', all.avg],
+      ['Hundreds', bat.filter(x=>x.v>=100).length], ['Fifties', bat.filter(x=>x.v>=50&&x.v<100).length], ['30s', bat.filter(x=>x.v>=30&&x.v<50).length], ['Ducks', bat.filter(x=>x.v===0&&!x.no).length],
+      ['Average when 10+', a(bat.filter(x=>x.v>=10))], ['1st innings average', a(bat.filter(x=>x.first))], ['Setting innings average', a(bat.filter(x=>x.setting))], ['Chasing innings average', a(bat.filter(x=>x.chasing))]])}</div>
+    <div class="card"><h3>Bowling and fielding</h3>${kv([['Wickets', wk], ['Best innings', best ? yearLink(best.m, `${best.v} in ${best.m.year}`, 'openmatch', best.key) : '–'], ['Best match', bestDay ? `${bestDay.v} in ${bestDay.m.year}` : '–'], ['3-wicket innings', threes], ['Wickets defending a total', defend],
+      ['Catches', fld.c], ['Run outs', fld.ro], ['Stumpings', fld.st], ['Career points', `${Math.round(pts)} (${rankP ? ord(rankP) : '–'})`]])}
+      <p class="muted small">Some dismissals before 2022 weren’t recorded, so older bowling and fielding totals may be short.</p></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Has dismissed most</h3>${got.length ? kv(got.map(x=>[pLink(x.bt), x.c])) : '<p class="muted small">None recorded.</p>'}</div>
+    <div class="card"><h3>Dismissed most by</h3>${gotBy.length ? kv(gotBy.map(x=>[pLink(x.bw), x.c])) : '<p class="muted small">None recorded.</p>'}</div>
+  </div>
+  <div class="card"><h3>Match by match</h3><div class="tablewrap"><table><thead><tr><th>Match</th><th>Team</th><th>Batting</th><th class="n">Wkts</th><th class="n">Ct</th><th class="n">Points</th><th>Result</th></tr></thead><tbody>
+    ${rows.slice().reverse().map(x=>`<tr><td>${yearLink(x.m, String(x.m.year), 'openmatch')}</td><td><span class="teamtag ${x.t}">${x.t}</span></td><td class="small">${esc(x.scores.join(', ') || 'did not bat')}</td><td class="n">${x.mw||'–'}</td><td class="n">${x.mc||'–'}</td><td class="n">${Math.round(x.pts)}</td><td class="small">${x.tie?'Tied':x.won?'Won':'Lost'}${x.pom?' · ★ PoM':''}${x.pp?' · Players’ Player':''}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
 /* ---------------- export ---------------- */
+function exportAll(){
+  if (typeof XLSX === 'undefined') { UI.msg = 'The spreadsheet tool didn’t load. Check the internet connection and try again.'; return render(); }
+  const done = matches.filter(m=>m.full && !m.full.practice && m.status==='complete').map(m=>m.full).sort((a,b)=>(+a.matchNo)-(+b.matchNo));
+  const inns = [['Match No','Year','Inns','Team','Bat Pos','Batter','How Out','Fielder','Bowler','Runs','Not Out','Balls Faced']];
+  const bowl = [['Match No','Year','Inns','Batting Team','Bowler','Overs','Maidens','Runs','Wickets']];
+  const mt = [['Match No','Year','Date','Batted First','Innings per Side','Green Total','Blue Total','Winner','Result','Player of the Match','Players’ Player']];
+  const apps = {};
+  done.forEach(m => withMatch(m, () => {
+    const r = result(), imp = impact(m);
+    ['Green','Blue'].forEach(t => m.teams[t].forEach(n => apps[n] = (apps[n]||0) + 1));
+    m.innings.forEach(i => { const f = innFigures(i);
+      f.bat.forEach(b => inns.push([m.matchNo, m.year, i.no, i.team, b.pos, b.name, b.out?b.out.how:'Not out', b.out&&(NEEDS_FIELDER[b.out.how]||b.out.how==='Caught & bowled')?(b.out.fielder||b.out.bowler||''):'', b.out&&b.out.how!=='Run out'&&b.out.how!=='Unknown'?(b.out.bowler||''):'', b.runs, b.out?'':1, b.bk?b.balls:'']));
+      f.bowl.forEach(b => bowl.push([m.matchNo, m.year, i.no, i.team, b.name, b.overs??'', b.maidens??'', b.runs??'', b.wkts])); });
+    mt.push([m.matchNo, m.year, m.date, m.battingFirst, m.inningsPerSide, r.g, r.b, r.winner, resultText(r), imp?imp.pick.name:'', m.playersPlayer||'']);
+  }));
+  const pl = [['Heritage No','Player','Debut','Matches']].concat(players.map((p,i)=>[i+1, p.name, p.debut||'', apps[p.name]||0]));
+  const wb = XLSX.utils.book_new();
+  [['Innings',inns],['Bowling',bowl],['Matches',mt],['Players',pl]].forEach(([n,a]) => { const ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = a[0].map(h => ({wch: Math.max(9, String(h).length + 2)})); XLSX.utils.book_append_sheet(wb, ws, n); });
+  XLSX.writeFile(wb, `One-Dayer all matches ${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 function exportXlsx(){
   if (typeof XLSX === 'undefined') { alertMsg('The spreadsheet tool didn’t load. Check the internet connection and try again.'); return; }
   const r = result(), imp = impact(M);
@@ -867,11 +961,15 @@ document.addEventListener('click', e => {
     case 'addround': M.inningsPerSide++; UI.o = {}; V = 'openers'; save(); break;
     case 'view': V = t.dataset.v; UI.tab = null; if (V === 'honours') UI.fromHon = null; if (V==='score' && M && M.innings.length && !curInn().complete && !D) D = newDraft(''); if (V==='awards') UI.qr = true; break;
     case 'tab': UI.tab = +t.dataset.k; break;
+    case 'player': { const prev = {V, M, UI}; UI = {pname: t.dataset.n, prev}; V = 'player'; window.scrollTo(0,0); break; }
+    case 'backplayer': { const p = UI.fromPlayer; V = p.V; M = p.M; UI = p.UI; break; }
+    case 'pback': { const p = UI.prev; if (p) { V = p.V; M = p.M; UI = p.UI; } else V = 'home'; break; }
     case 'htab': UI.htab = t.dataset.k; UI.hsub = null; break;
     case 'hsub': UI.hsub = t.dataset.k; break;
-    case 'openaward': case 'openmatch': { const ht = UI.htab, hs = UI.hsub, dp = UI.dplayer; openMatch(t.dataset.id); UI.fromHon = ht || 'heritage'; UI.fromSub = hs; UI.fromDp = dp; if (a === 'openaward') V = 'awards'; if (t.dataset.inn) { const [tm, no] = t.dataset.inn.split('|'); const k = M.innings.findIndex(i => i.team === tm && String(i.no) === no); if (k >= 0) UI.tab = k; } break; }
+    case 'openaward': case 'openmatch': { const fromPlayer = V === 'player' ? {V, M, UI} : null; const ht = UI.htab, hs = UI.hsub, dp = UI.dplayer; openMatch(t.dataset.id); if (fromPlayer) { UI.fromPlayer = fromPlayer; if (t.dataset.inn) { const [tm, no] = t.dataset.inn.split('|'); const k = M.innings.findIndex(i => i.team === tm && String(i.no) === no); if (k >= 0) UI.tab = k; } break; } UI.fromHon = ht || 'heritage'; UI.fromSub = hs; UI.fromDp = dp; if (a === 'openaward') V = 'awards'; if (t.dataset.inn) { const [tm, no] = t.dataset.inn.split('|'); const k = M.innings.findIndex(i => i.team === tm && String(i.no) === no); if (k >= 0) UI.tab = k; } break; }
     case 'backhon': { const ht = UI.fromHon, hs = UI.fromSub, dp = UI.fromDp; M = null; D = null; UI = {htab: ht, hsub: hs, dplayer: dp}; V = 'honours'; break; }
     case 'export': exportXlsx(); return;
+    case 'exportall': exportAll(); return;
     case 'openvote': M.voting = 'open'; M.playersPlayer = null; save(); refreshListEntry(); UI.qr = true; break;
     case 'closevote': { M.voting = 'closed'; const rows = tally(M.id); if (rows.length && (rows.length === 1 || rows[0][1] > rows[1][1])) M.playersPlayer = rows[0][0]; save(); refreshListEntry(); break; }
     case 'setpp': M.playersPlayer = t.dataset.n; save(); refreshListEntry(); break;
@@ -939,9 +1037,14 @@ function subscribe(){
   ['players','matches','votes'].forEach(k => db.ref(k).off());
   UI.readDenied = false;
   const denied = () => { loaded.players = loaded.matches = true; UI.readDenied = true; render(); };
-  db.ref('players').on('value', s => { players = arr(s.val()); loaded.players = true; if (['home','admin'].includes(V)) render(); }, denied);
+  db.ref('players').on('value', s => { players = arr(s.val()); lsSet('cache_players', players); loaded.players = true; if (['home','admin','honours','player'].includes(V)) render(); }, denied);
   db.ref('matches').on('value', s => {
     const all = s.val() || {};
+    if (canWrite) { // anything saved on this device that the server hasn't got (e.g. scored offline then reloaded) goes back up
+      (lsGet('localIds')||[]).forEach(id => { const local = lsGet('match_'+id); if (!local) return; const srv = all[id];
+        if (!srv || (local.updatedAt||0) > (srv.updatedAt||0)) { all[id] = local; db.ref('matches/'+id).set(clone(local)).catch(()=>{}); } });
+    }
+    lsSet('cache_matches', all);
     const keepId = (M && canWrite && ['setup','openers','score'].includes(V)) ? M.id : null;
     const next = [];
     Object.values(all).forEach(m => { if (!m || !m.id) return; normalize(m);
@@ -953,13 +1056,25 @@ function subscribe(){
     if (['home','card','vote','awards','admin','honours'].includes(V)) render();
   }, denied);
   db.ref('votes').on('value', s => { VOTES = s.val() || {}; if (['awards','vote'].includes(V)) render(); }, () => {});
+  db.ref('.info/connected').off(); db.ref('.info/connected').on('value', s => { clearTimeout(window.__offT); const set = v => { const was = online; online = v; if (was !== online) render(); else paintSave(); }; if (s.val()) set(true); else window.__offT = setTimeout(() => set(false), 4000); });
+}
+function loadCache(){
+  const ps = lsGet('cache_players'); if (Array.isArray(ps) && ps.length) { players = ps; loaded.players = true; }
+  const ms = lsGet('cache_matches');
+  if (ms && typeof ms === 'object') {
+    (lsGet('localIds')||[]).forEach(id => { const l = lsGet('match_'+id); if (l && (!ms[id] || (l.updatedAt||0) > (ms[id].updatedAt||0))) ms[id] = l; });
+    matches = Object.values(ms).filter(m => m && m.id).map(m => { normalize(m); return {id:m.id, date:m.date, status:m.status, summary:summaryOf(m), full:m}; });
+    loaded.matches = true;
+  }
 }
 
 /* ---------------- boot ---------------- */
 (function boot(){
   if (location.hash === '#vote') V = 'vote';
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  loadCache();
   render();
-  if (typeof firebase === 'undefined') { $app.insertAdjacentHTML('afterbegin', '<div class="notice bad">Couldn’t reach the scoring service. Check the internet connection and reload.</div>'); return; }
+  if (typeof firebase === 'undefined') { online = false; $app.insertAdjacentHTML('afterbegin', '<div class="notice warn">Offline: showing the scores saved on this device.</div>'); return; }
   firebase.initializeApp(firebaseConfig);
   db = firebase.database(); auth = firebase.auth();
   auth.onAuthStateChanged(u => {
