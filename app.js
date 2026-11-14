@@ -798,6 +798,33 @@ function vHonours(){
 
 
 /* ---- player pages ---- */
+function avgChart(bat, careerAvg, sel){
+  // one bar per year played: that year's batting average (runs ÷ times out)
+  const by = {};
+  bat.forEach(x => { const y = x.m.year; const o = by[y] = by[y] || {y, runs:0, inns:0, no:0}; o.runs += x.v; o.inns++; if (x.no) o.no++; });
+  const yrs = Object.values(by).sort((a,b)=>a.y-b.y).map(o => ({...o, avg: o.inns - o.no ? o.runs / (o.inns - o.no) : null}));
+  if (!yrs.length) return '';
+  const narrow = (window.innerWidth || 800) < 600, W = narrow ? 360 : 640, H = narrow ? 230 : 250, L = narrow ? 30 : 40, R = 8, T = 22, B = 30, pw = W - L - R, ph = H - T - B;
+  const top = Math.max(10, ...yrs.map(o=>o.avg||0), careerAvg||0);
+  const step = top > 120 ? 40 : top > 60 ? 20 : top > 30 ? 10 : 5, max = Math.ceil(top / step) * step;
+  const yv = v => T + ph - v / max * ph, slot = pw / yrs.length, bw = Math.min(46, slot * 0.62);
+  const best = yrs.reduce((a,o)=>(o.avg||0)>(a.avg||0)?o:a, yrs[0]);
+  let g = '';
+  for (let v = 0; v <= max; v += step) g += `<line x1="${L}" x2="${W-R}" y1="${yv(v)}" y2="${yv(v)}" class="cg${v?'':' base'}"/><text x="${L-6}" y="${yv(v)+4}" class="ct" text-anchor="end">${v}</text>`;
+  const bars = yrs.map((o,i) => { const cx = L + slot*i + slot/2, x = cx - bw/2, on = sel == o.y;
+    const tip = `${o.y}: ${o.avg==null?'no dismissals':'average '+o.avg.toFixed(1)} · ${o.runs} runs from ${o.inns} innings${o.no?` (${o.no} not out)`:''}`;
+    const h = o.avg == null ? 0 : Math.max(2, o.avg / max * ph), y = yv(o.avg||0);
+    const shape = o.avg == null ? `<text x="${cx}" y="${yv(0)-6}" class="ct" text-anchor="middle">n/o</text>`
+      : `<path d="M${x},${yv(0)} V${y+4} Q${x},${y} ${x+4},${y} H${x+bw-4} Q${x+bw},${y} ${x+bw},${y+4} V${yv(0)} Z" class="cb${on?' on':''}"/>`;
+    const lab = (on || o === best) && o.avg != null ? `<text x="${cx}" y="${y-6}" class="cv" text-anchor="middle">${o.avg.toFixed(1)}</text>` : '';
+    return `<g class="cbar" data-act="pbar" data-y="${o.y}" tabindex="0" role="button" aria-label="${esc(tip)}"><title>${esc(tip)}</title><rect x="${L+slot*i}" y="${T}" width="${slot}" height="${ph}" fill="transparent"/>${shape}${lab}<text x="${cx}" y="${H-10}" class="ct${on?' strong':''}" text-anchor="middle">${yrs.length>8?"’"+String(o.y).slice(2):o.y}</text></g>`; }).join('');
+  const cl = careerAvg ? `<line x1="${L}" x2="${W-R}" y1="${yv(careerAvg)}" y2="${yv(careerAvg)}" class="cl"/><text x="${W-R}" y="${yv(careerAvg)-6}" class="ct" text-anchor="end">Career ${careerAvg.toFixed(1)}</text>` : '';
+  const pick = yrs.find(o => o.y == sel);
+  return `<div class="card"><div class="row spread"><h3>Batting average by year</h3><span class="muted small">Tap a year for details</span></div>
+    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Batting average for each year played">${g}${bars}${cl}</svg>
+    <div class="small ${pick?'':'muted'}" style="min-height:1.4em">${pick ? `<b>${pick.y}:</b> ${pick.avg==null?'no dismissals, so no average':'average <b>'+pick.avg.toFixed(2)+'</b>'} · ${pick.runs} runs from ${pick.inns} innings${pick.no?` (${pick.no} not out)`:''}` : 'Average = runs ÷ times out. “n/o” = never dismissed that year.'}</div></div>`;
+}
+
 const pLink = n => `<button class="namebtn" data-act="player" data-n="${esc(n)}">${esc(n)}</button>`;
 function vPlayer(){
   const name = UI.pname, {done, H} = honoursData();
@@ -842,6 +869,7 @@ function vPlayer(){
     ${tile('Wickets', wk, best ? `best ${best.v} in an innings` : '')}
     ${tile('Catches', fld.c, fld.ro || fld.st ? `${fld.ro} run out${fld.ro===1?'':'s'} · ${fld.st} stumping${fld.st===1?'':'s'}` : '')}
   </div>
+  ${avgChart(bat, all.avg === '–' ? null : +all.avg, UI.pbar)}
   <div class="grid2">
     <div class="card"><h3>Batting</h3>${kv([['Innings', all.inns], ['Not outs', all.no], ['Runs', all.runs], ['Average', all.avg],
       ['Hundreds', bat.filter(x=>x.v>=100).length], ['Fifties', bat.filter(x=>x.v>=50&&x.v<100).length], ['30s', bat.filter(x=>x.v>=30&&x.v<50).length], ['Ducks', bat.filter(x=>x.v===0&&!x.no).length],
@@ -964,6 +992,7 @@ document.addEventListener('click', e => {
     case 'player': { const prev = {V, M, UI}; UI = {pname: t.dataset.n, prev}; V = 'player'; window.scrollTo(0,0); break; }
     case 'backplayer': { const p = UI.fromPlayer; V = p.V; M = p.M; UI = p.UI; break; }
     case 'pback': { const p = UI.prev; if (p) { V = p.V; M = p.M; UI = p.UI; } else V = 'home'; break; }
+    case 'pbar': UI.pbar = UI.pbar == t.dataset.y ? null : t.dataset.y; break;
     case 'htab': UI.htab = t.dataset.k; UI.hsub = null; break;
     case 'hsub': UI.hsub = t.dataset.k; break;
     case 'openaward': case 'openmatch': { const fromPlayer = V === 'player' ? {V, M, UI} : null; const ht = UI.htab, hs = UI.hsub, dp = UI.dplayer; openMatch(t.dataset.id); if (fromPlayer) { UI.fromPlayer = fromPlayer; if (t.dataset.inn) { const [tm, no] = t.dataset.inn.split('|'); const k = M.innings.findIndex(i => i.team === tm && String(i.no) === no); if (k >= 0) UI.tab = k; } break; } UI.fromHon = ht || 'heritage'; UI.fromSub = hs; UI.fromDp = dp; if (a === 'openaward') V = 'awards'; if (t.dataset.inn) { const [tm, no] = t.dataset.inn.split('|'); const k = M.innings.findIndex(i => i.team === tm && String(i.no) === no); if (k >= 0) UI.tab = k; } break; }

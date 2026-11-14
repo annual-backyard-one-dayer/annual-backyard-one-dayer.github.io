@@ -218,6 +218,13 @@ textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:
 .tile .val{font-family:var(--display);font-size:32px;font-weight:700;line-height:1.05}
 .tile .sub{font-size:13px;color:var(--muted)}
 table.kv td{padding:6px 4px}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart .cg{stroke:var(--line);stroke-width:1}.chart .cg.base{stroke:var(--muted)}
+.chart .ct{fill:var(--muted);font-size:12px;font-family:var(--body)}.chart .ct.strong{fill:var(--ink);font-weight:600}
+.chart .cv{fill:var(--ink);font-size:13px;font-weight:600;font-family:var(--body)}
+.chart .cb{fill:var(--turf);opacity:.78}.chart .cb.on,.chart .cbar:hover .cb,.chart .cbar:focus .cb{opacity:1}
+.chart .cbar{cursor:pointer;outline:none}
+.chart .cl{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:5 4;opacity:.6}
 </style>
 </head>
 <body>
@@ -228,6 +235,6 @@ table.kv td{padding:6px 4px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js?v=36"></script>
+<script src="app.js?v=37"></script>
 </body>
 </html>
