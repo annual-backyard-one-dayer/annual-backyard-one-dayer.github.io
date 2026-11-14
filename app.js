@@ -869,7 +869,6 @@ function vPlayer(){
     ${tile('Wickets', wk, best ? `best ${best.v} in an innings` : '')}
     ${tile('Catches', fld.c, fld.ro || fld.st ? `${fld.ro} run out${fld.ro===1?'':'s'} · ${fld.st} stumping${fld.st===1?'':'s'}` : '')}
   </div>
-  ${avgChart(bat, all.avg === '–' ? null : +all.avg, UI.pbar)}
   <div class="grid2">
     <div class="card"><h3>Batting</h3>${kv([['Innings', all.inns], ['Not outs', all.no], ['Runs', all.runs], ['Average', all.avg],
       ['Hundreds', bat.filter(x=>x.v>=100).length], ['Fifties', bat.filter(x=>x.v>=50&&x.v<100).length], ['30s', bat.filter(x=>x.v>=30&&x.v<50).length], ['Ducks', bat.filter(x=>x.v===0&&!x.no).length],
@@ -883,7 +882,8 @@ function vPlayer(){
     <div class="card"><h3>Dismissed most by</h3>${gotBy.length ? kv(gotBy.map(x=>[pLink(x.bw), x.c])) : '<p class="muted small">None recorded.</p>'}</div>
   </div>
   <div class="card"><h3>Match by match</h3><div class="tablewrap"><table><thead><tr><th>Match</th><th>Team</th><th>Batting</th><th class="n">Wkts</th><th class="n">Ct</th><th class="n">Points</th><th>Result</th></tr></thead><tbody>
-    ${rows.slice().reverse().map(x=>`<tr><td>${yearLink(x.m, String(x.m.year), 'openmatch')}</td><td><span class="teamtag ${x.t}">${x.t}</span></td><td class="small">${esc(x.scores.join(', ') || 'did not bat')}</td><td class="n">${x.mw||'–'}</td><td class="n">${x.mc||'–'}</td><td class="n">${Math.round(x.pts)}</td><td class="small">${x.tie?'Tied':x.won?'Won':'Lost'}${x.pom?' · ★ PoM':''}${x.pp?' · Players’ Player':''}</td></tr>`).join('')}</tbody></table></div></div>`;
+    ${rows.slice().reverse().map(x=>`<tr><td>${yearLink(x.m, String(x.m.year), 'openmatch')}</td><td><span class="teamtag ${x.t}">${x.t}</span></td><td class="small">${esc(x.scores.join(', ') || 'did not bat')}</td><td class="n">${x.mw||'–'}</td><td class="n">${x.mc||'–'}</td><td class="n">${Math.round(x.pts)}</td><td class="small">${x.tie?'Tied':x.won?'Won':'Lost'}${x.pom?' · ★ PoM':''}${x.pp?' · Players’ Player':''}</td></tr>`).join('')}</tbody></table></div></div>
+  ${avgChart(bat, all.avg === '–' ? null : +all.avg, UI.pbar)}`;
 }
 
 /* ---------------- export ---------------- */
